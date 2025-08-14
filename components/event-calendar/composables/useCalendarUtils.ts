@@ -17,7 +17,8 @@ export function useCalendarUtils() {
   const getEventStyle = (
     event: CalendarEvent,
     dayContextDate: Date,
-    pixelsPerHour: number = PIXELS_PER_HOUR_CONFIG
+    pixelsPerHour: number = PIXELS_PER_HOUR_CONFIG,
+    overlappingEvents: CalendarEvent[] = []
   ) => {
     const eventStart = new Date(event.startDate)
     const eventEnd = new Date(event.endDate)
@@ -49,12 +50,72 @@ export function useCalendarUtils() {
     const durationMinutes = Math.max(15, endMinutesOffset - startMinutesOffset)
     const height = (durationMinutes / 60) * pixelsPerHour
 
+    // Handle overlapping events
+    let left = "0%"
+    let width = "100%"
+    
+    if (overlappingEvents.length > 0) {
+      const eventIndex = overlappingEvents.findIndex(e => e.id === event.id)
+      const totalOverlapping = overlappingEvents.length
+      
+      if (eventIndex !== -1) {
+        const columnWidth = 100 / totalOverlapping
+        left = `${eventIndex * columnWidth}%`
+        width = `${columnWidth - 1}%` // Small gap between overlapping events
+      }
+    }
+
     return {
       top: `${top}px`,
       height: `${height}px`,
-      left: "0%", // Basic, no overlap management
-      width: "100%", // Basic, no overlap management
+      left,
+      width,
+      zIndex: overlappingEvents.length > 0 ? 10 + overlappingEvents.findIndex(e => e.id === event.id) : 5
     }
+  }
+
+  const detectOverlappingEvents = (events: CalendarEvent[], targetDate: Date): CalendarEvent[][] => {
+    const dayEvents = events.filter(event => {
+      const eventStart = new Date(event.startDate)
+      const eventEnd = new Date(event.endDate)
+      const dayStart = startOfDay(targetDate)
+      const dayEnd = endOfDay(targetDate)
+      
+      return (eventStart >= dayStart && eventStart <= dayEnd) ||
+             (eventEnd >= dayStart && eventEnd <= dayEnd) ||
+             (eventStart <= dayStart && eventEnd >= dayEnd)
+    })
+
+    const overlappingGroups: CalendarEvent[][] = []
+    const processed = new Set<string>()
+
+    dayEvents.forEach(event => {
+      if (processed.has(event.id)) return
+
+      const overlapping = [event]
+      processed.add(event.id)
+
+      dayEvents.forEach(otherEvent => {
+        if (processed.has(otherEvent.id) || event.id === otherEvent.id) return
+
+        const eventStart = new Date(event.startDate)
+        const eventEnd = new Date(event.endDate)
+        const otherStart = new Date(otherEvent.startDate)
+        const otherEnd = new Date(otherEvent.endDate)
+
+        // Check if events overlap
+        if ((eventStart < otherEnd && eventEnd > otherStart)) {
+          overlapping.push(otherEvent)
+          processed.add(otherEvent.id)
+        }
+      })
+
+      if (overlapping.length > 1) {
+        overlappingGroups.push(overlapping)
+      }
+    })
+
+    return overlappingGroups
   }
 
   const generateTimeSlots = (day: Date): TimeSlot[] => {

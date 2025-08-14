@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue"
+import { ref, computed, watch, shallowRef } from "vue"
+import { useKeyboardNavigation } from "./composables/useKeyboardNavigation"
+import { useDragAndDropSystem } from "./composables/useDragAndDrop"
 import {
   format,
   addMonths,
@@ -17,13 +19,18 @@ import {
   endOfDay,
 } from "date-fns"
 import { v4 as uuidv4 } from "uuid"
-import type { CalendarEvent, ViewMode, MonthViewDay, DayColumnData } from "./types" // Adjust path
+import type { CalendarEvent, ViewMode, MonthViewDay, DayColumnData } from "./types"
+import { useEventFiltering } from "./composables/useEventFiltering"
+import { useErrorHandling } from "./composables/useErrorHandling"
+import { useColorManager } from "./composables/useColorManager"
 import MonthView from "./MonthView.vue"
 import WeekView from "./WeekView.vue"
 import DayView from "./DayView.vue"
 import AgendaView from "./AgendaView.vue"
 import EventModal from "./EventModal.vue"
+import DragDropVisualFeedback from "./DragDropVisualFeedback.vue"
 import { Button } from "@/components/ui/button"
+import DarkModeToggle from "@/components/ui/DarkModeToggle.vue"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,16 +52,39 @@ const emit = defineEmits<{
 
 const currentView = ref<ViewMode>(props.initialView || "month")
 const currentDate = ref(new Date())
-const localEvents = ref<CalendarEvent[]>([])
+const localEvents = shallowRef<CalendarEvent[]>([])
+
+// Initialize composables
+const { handleError, validateEvent, withErrorHandling } = useErrorHandling()
+const eventsComputed = computed(() => localEvents.value)
+const { getEventsForDay, getAllDayEventsForDay, getTimedEventsForDay, getAgendaEvents, isToday } = useEventFiltering(eventsComputed)
+
+// Initialize color manager
+const { 
+  assignUniqueColor, 
+  assignColorsToEvents, 
+  getColorClasses, 
+  hasColorConflict,
+  getColorStats 
+} = useColorManager(eventsComputed)
+
+// Initialize enhanced drag and drop system
+const { 
+  globalDragState, 
+  formatEventDuration, 
+  calculateEventHeight 
+} = useDragAndDropSystem({
+  enabled: true,
+  crossViewEnabled: true,
+  visualFeedback: true,
+  showDuration: true,
+  enableResize: true
+})
 
 watch(
   () => props.events,
   newEvents => {
-    localEvents.value = newEvents.map(e => ({
-      ...e,
-      start: new Date(e.startDate),
-      end: new Date(e.endDate),
-    }))
+    localEvents.value = [...newEvents]
   },
   { deep: true, immediate: true }
 )
@@ -66,38 +96,6 @@ const eventForPopup = ref<CalendarEvent | null>(null)
 const popupTargetDate = ref<Date | null>(null)
 const popupIsAllDayFromCell = ref<boolean>(false)
 
-// Add keyboard shortcuts for view switching
-onKeyStroke(
-  (e: KeyboardEvent) => {
-    // Skip if user is typing in an input, textarea or contentEditable element
-    // or if the event dialog is open
-    if (
-      isEventModalOpen.value ||
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement ||
-      (e.target instanceof HTMLElement && e.target.isContentEditable)
-    ) {
-      return
-    }
-
-    switch (e.key.toLowerCase()) {
-      case "m":
-        currentView.value = "month"
-        break
-      case "w":
-        currentView.value = "week"
-        break
-      case "d":
-        currentView.value = "day"
-        break
-      case "a":
-        currentView.value = "agenda"
-        break
-    }
-  },
-  { eventName: "keydown" }
-)
-
 const navigate = (direction: "prev" | "next" | "today") => {
   if (direction === "today") {
     currentDate.value = new Date()
@@ -107,6 +105,7 @@ const navigate = (direction: "prev" | "next" | "today") => {
   if (currentView.value === "month") currentDate.value = addMonths(currentDate.value, S)
   else if (currentView.value === "week") currentDate.value = addWeeks(currentDate.value, S)
   else if (currentView.value === "day") currentDate.value = addDays(currentDate.value, S)
+  else if (currentView.value === "agenda") currentDate.value = addMonths(currentDate.value, S)
 }
 
 const calendarTitle = computed(() => {
@@ -117,7 +116,8 @@ const calendarTitle = computed(() => {
     return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`
   }
   if (currentView.value === "day") return format(currentDate.value, "MMMM d, yyyy")
-  return "Agenda" // Agenda view might not have a dynamic title like this
+  if (currentView.value === "agenda") return format(currentDate.value, "MMMM yyyy")
+  return "Calendar"
 })
 
 const openAddModalHandler = (date?: Date, isAllDaySlot?: boolean, allDayTargetDate?: Date) => {
@@ -136,14 +136,33 @@ const openEditModalHandler = (event: CalendarEvent) => {
   isEventModalOpen.value = true
 }
 
-const handleModalSubmit = (eventPayload: CalendarEvent, mode: "add" | "edit") => {
-  if (mode === "add") {
-    emit("eventAdd", { ...eventPayload, id: uuidv4() })
-  } else {
-    // id should be present in eventPayload if mode is 'edit' due to form pre-fill
-    emit("eventUpdate", eventPayload)
+const handleModalSubmit = async (eventPayload: CalendarEvent, mode: "add" | "edit") => {
+  // Validate event data before processing
+  const validationErrors = validateEvent(eventPayload)
+  if (validationErrors.length > 0) {
+    handleError(validationErrors.join(', '))
+    return
   }
-  isEventModalOpen.value = false // Close popup on submit
+
+  await withErrorHandling(async () => {
+    if (mode === "add") {
+      // Assign unique color if not already set
+      const eventWithColor = {
+        ...eventPayload,
+        id: uuidv4(),
+        color: eventPayload.color || assignUniqueColor(eventPayload)
+      }
+      emit("eventAdd", eventWithColor)
+    } else {
+      // For edit mode, keep existing color or assign new one if needed
+      const eventWithColor = {
+        ...eventPayload,
+        color: eventPayload.color || assignUniqueColor(eventPayload)
+      }
+      emit("eventUpdate", eventWithColor)
+    }
+    isEventModalOpen.value = false // Close popup on submit
+  }, `Failed to ${mode} event`)
 }
 
 const handleModalDelete = (eventId: string) => {
@@ -152,16 +171,21 @@ const handleModalDelete = (eventId: string) => {
 }
 
 // Data preparation for views
+// Memoize today's date to avoid repeated Date() calls
+const today = computed(() => new Date())
+
 const monthViewDaysComputed = computed<MonthViewDay[]>(() => {
   const startMonth = startOfMonth(currentDate.value)
   const endMonth = endOfMonth(currentDate.value)
   const startCalendar = startOfWeek(startMonth, { weekStartsOn: 1 })
   const endCalendar = endOfWeek(endMonth, { weekStartsOn: 1 })
+  const currentMonth = currentDate.value.getMonth()
+  const todayValue = today.value
 
   return eachDayOfInterval({ start: startCalendar, end: endCalendar }).map(day => ({
     date: day,
-    isCurrentMonth: day.getMonth() === currentDate.value.getMonth(),
-    isToday: isSameDay(day, new Date()),
+    isCurrentMonth: day.getMonth() === currentMonth,
+    isToday: isSameDay(day, todayValue),
     events: localEvents.value.filter(event => {
       const eventStartDay = startOfDay(new Date(event.startDate))
       // For month view, an event ending at midnight on day X is still considered to be on day X-1
@@ -177,85 +201,108 @@ const monthViewDaysComputed = computed<MonthViewDay[]>(() => {
 const weekViewDaysComputed = computed<DayColumnData[]>(() => {
   const weekStart = startOfWeek(currentDate.value, { weekStartsOn: 1 })
   const weekEnd = endOfWeek(currentDate.value, { weekStartsOn: 1 })
+  const todayValue = today.value
 
   return eachDayOfInterval({ start: weekStart, end: weekEnd }).map(day => {
-    const dayStart = startOfDay(day)
-    const dayPlusOne = addDays(dayStart, 1)
     return {
       date: day,
       dateKey: format(day, "yyyy-MM-dd"),
       dayLabel: format(day, "E dd"),
-      isToday: isSameDay(day, new Date()),
-      allDayEvents: localEvents.value.filter(
-        event =>
-          event.allDay &&
-          isWithinInterval(day, {
-            start: startOfDay(new Date(event.startDate)),
-            end: endOfDay(new Date(event.endDate)),
-          })
-      ),
-      // timeSlots: generateTimeSlots(day), // generateTimeSlots is in composable, can be called by WeekView
-      timedEventsRaw: localEvents.value.filter(
-        event =>
-          !event.allDay &&
-          (isWithinInterval(new Date(event.startDate), { start: dayStart, end: dayPlusOne }) ||
-            isWithinInterval(new Date(event.endDate), { start: dayStart, end: dayPlusOne }) ||
-            (new Date(event.startDate) < dayStart && new Date(event.endDate) > dayPlusOne))
-      ),
-    } as DayColumnData // Added 'as DayColumnData'
+      isToday: isSameDay(day, todayValue),
+      allDayEvents: getAllDayEventsForDay(day).value,
+      timedEventsRaw: getTimedEventsForDay(day).value,
+    } as DayColumnData
   })
 })
 
 const dayViewDataComputed = computed<DayColumnData>(() => {
   const day = currentDate.value
-  const dayStart = startOfDay(day)
-  const dayPlusOne = addDays(dayStart, 1)
+  const todayValue = today.value
   return {
     date: day,
     dateKey: format(day, "yyyy-MM-dd"),
-    isToday: isSameDay(day, new Date()),
-    allDayEvents: localEvents.value.filter(
-      event =>
-        event.allDay &&
-        isWithinInterval(day, { start: startOfDay(new Date(event.startDate)), end: endOfDay(new Date(event.endDate)) })
-    ),
-    // timeSlots: generateTimeSlots(day), // generateTimeSlots is in composable, can be called by DayView
-    timedEventsRaw: localEvents.value.filter(
-      event =>
-        !event.allDay &&
-        (isWithinInterval(new Date(event.startDate), { start: dayStart, end: dayPlusOne }) ||
-          isWithinInterval(new Date(event.endDate), { start: dayStart, end: dayPlusOne }) ||
-          (new Date(event.startDate) < dayStart && new Date(event.endDate) > dayPlusOne))
-    ),
-  } as DayColumnData // Added 'as DayColumnData'
+    isToday: isSameDay(day, todayValue),
+    allDayEvents: getAllDayEventsForDay(day).value,
+    timedEventsRaw: getTimedEventsForDay(day).value,
+  } as DayColumnData
 })
 
 const agendaEventsComputed = computed<CalendarEvent[]>(() => {
-  return [...localEvents.value]
-    .filter(event => new Date(event.startDate) >= startOfDay(currentDate.value))
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+  return getAgendaEvents(currentDate.value).value
 })
 
 const handleEventUpdateFromView = (updatedEvent: CalendarEvent) => {
   emit("eventUpdate", updatedEvent)
 }
+
+// Initialize enhanced keyboard navigation
+useKeyboardNavigation(
+  currentView,
+  currentDate,
+  isEventModalOpen,
+  navigate,
+  () => openAddModalHandler()
+)
+
+// Drag and drop system is automatically initialized when useDragAndDropSystem is called
 </script>
 
 <template>
-  <div class="p-4 flex flex-col h-full bg-background text-foreground">
-    <header class="flex items-center justify-between mb-4">
-      <!-- Header content (same as before) -->
-      <div class="flex items-center gap-2">
-        <Button variant="outline" @click="navigate('prev')">&lt;</Button>
-        <Button variant="outline" @click="navigate('today')">Today</Button>
-        <Button variant="outline" @click="navigate('next')">&gt;</Button>
-        <h2 class="text-xl font-semibold ml-4">{{ calendarTitle }}</h2>
+  <div class="p-6 flex flex-col h-full bg-background text-foreground border border-border rounded-lg shadow-sm transition-colors duration-300">
+    
+    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3 sm:gap-0">
+      <!-- Navigation and title -->
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <nav class="flex items-center gap-1 sm:gap-2" role="navigation" aria-label="Calendar navigation">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            class="h-9 w-9 p-0"
+            :aria-label="`Go to previous ${currentView}`"
+            @click="navigate('prev')"
+          >
+            <Icon name="lucide:chevron-left" size="16" aria-hidden="true" />
+            <span class="sr-only">Previous</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            class="h-9 px-3"
+            @click="navigate('today')"
+            aria-label="Go to today"
+          >
+            Today
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            class="h-9 w-9 p-0"
+            :aria-label="`Go to next ${currentView}`"
+            @click="navigate('next')"
+          >
+            <Icon name="lucide:chevron-right" size="16" aria-hidden="true" />
+            <span class="sr-only">Next</span>
+          </Button>
+        </nav>
+        <h1 class="text-lg sm:text-xl font-semibold ml-2 sm:ml-4 truncate" role="heading" aria-level="1">
+          {{ calendarTitle }}
+        </h1>
       </div>
-      <div class="flex items-center gap-2">
-        <Button variant="default" @click="openAddModalHandler()">Add Event</Button>
+      <!-- Actions -->
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+        <Button 
+          variant="default" 
+          size="sm" 
+          class="h-9 px-3" 
+          @click="openAddModalHandler()"
+        >
+          <Icon name="lucide:plus" size="16" class="mr-1" />
+          <span class="hidden sm:inline">Add Event</span>
+          <span class="sm:hidden">Add</span>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button variant="outline" class="gap-1.5 max-[479px]:h-8">
+            <Button variant="outline" size="sm" class="h-9 gap-1.5 px-3">
               <span>
                 <span className="min-[480px]:hidden" aria-hidden="true">
                   {{ currentView.charAt(0).toUpperCase() }}
@@ -282,6 +329,7 @@ const handleEventUpdateFromView = (updatedEvent: CalendarEvent) => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <DarkModeToggle />
       </div>
     </header>
 
@@ -313,6 +361,7 @@ const handleEventUpdateFromView = (updatedEvent: CalendarEvent) => {
       <AgendaView
         v-if="currentView === 'agenda'"
         :events="agendaEventsComputed"
+        :current-date="currentDate"
         @open-edit-modal="openEditModalHandler"
       />
     </main>
@@ -326,6 +375,15 @@ const handleEventUpdateFromView = (updatedEvent: CalendarEvent) => {
       :is-all-day-from-cell="popupIsAllDayFromCell"
       @submit-event="handleModalSubmit"
       @delete-event="handleModalDelete"
+    />
+
+    <!-- Drag and Drop Visual Feedback -->
+    <DragDropVisualFeedback
+      :is-dragging="globalDragState.isDragging"
+      :dragged-event="globalDragState.draggedEvent"
+      :valid-drop-zones="globalDragState.validDropZones.map(zone => zone.id)"
+      :current-drop-zone="globalDragState.currentDropZone?.id"
+      :drag-position="globalDragState.dragPreview ? { x: globalDragState.dragPreview.x, y: globalDragState.dragPreview.y } : { x: 0, y: 0 }"
     />
   </div>
 </template>

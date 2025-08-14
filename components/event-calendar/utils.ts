@@ -1,117 +1,157 @@
-import { isSameDay } from "date-fns"
-
-import type { CalendarEvent, EventColor } from "./types"
+import type { CalendarEvent } from './types'
 
 /**
- * Get CSS classes for event colors
+ * Performance utilities for calendar operations
  */
-export function getEventColorClasses(color?: EventColor | string): string {
-  const eventColor = color || "sky"
 
-  switch (eventColor) {
-    case "sky":
-      return "bg-sky-200/50 hover:bg-sky-200/40 text-sky-950/80 dark:bg-sky-400/25 dark:hover:bg-sky-400/20 dark:text-sky-200 shadow-sky-700/8"
-    case "amber":
-      return "bg-amber-200/50 hover:bg-amber-200/40 text-amber-950/80 dark:bg-amber-400/25 dark:hover:bg-amber-400/20 dark:text-amber-200 shadow-amber-700/8"
-    case "violet":
-      return "bg-violet-200/50 hover:bg-violet-200/40 text-violet-950/80 dark:bg-violet-400/25 dark:hover:bg-violet-400/20 dark:text-violet-200 shadow-violet-700/8"
-    case "rose":
-      return "bg-rose-200/50 hover:bg-rose-200/40 text-rose-950/80 dark:bg-rose-400/25 dark:hover:bg-rose-400/20 dark:text-rose-200 shadow-rose-700/8"
-    case "emerald":
-      return "bg-emerald-200/50 hover:bg-emerald-200/40 text-emerald-950/80 dark:bg-emerald-400/25 dark:hover:bg-emerald-400/20 dark:text-emerald-200 shadow-emerald-700/8"
-    case "orange":
-      return "bg-orange-200/50 hover:bg-orange-200/40 text-orange-950/80 dark:bg-orange-400/25 dark:hover:bg-orange-400/20 dark:text-orange-200 shadow-orange-700/8"
-    default:
-      return "bg-sky-200/50 hover:bg-sky-200/40 text-sky-950/80 dark:bg-sky-400/25 dark:hover:bg-sky-400/20 dark:text-sky-200 shadow-sky-700/8"
+// Debounce function for performance optimization
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null
+  
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
   }
 }
 
-/**
- * Get CSS classes for border radius based on event position in multi-day events
- */
-export function getBorderRadiusClasses(isFirstDay: boolean, isLastDay: boolean): string {
-  if (isFirstDay && isLastDay) {
-    return "rounded" // Both ends rounded
-  } else if (isFirstDay) {
-    return "rounded-l rounded-r-none" // Only left end rounded
-  } else if (isLastDay) {
-    return "rounded-r rounded-l-none" // Only right end rounded
+// Throttle function for drag operations
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let inThrottle: boolean = false
+  
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      func(...args)
+      inThrottle = true
+      setTimeout(() => inThrottle = false, limit)
+    }
+  }
+}
+
+// Memoization for expensive calculations
+export function memoize<T extends (...args: any[]) => any>(fn: T): T {
+  const cache = new Map()
+  
+  return ((...args: Parameters<T>) => {
+    const key = JSON.stringify(args)
+    if (cache.has(key)) {
+      return cache.get(key)
+    }
+    
+    const result = fn(...args)
+    cache.set(key, result)
+    return result
+  }) as T
+}
+
+// Virtual scrolling helper for large event lists
+export function getVisibleRange(
+  scrollTop: number,
+  containerHeight: number,
+  itemHeight: number,
+  totalItems: number,
+  overscan: number = 5
+) {
+  const start = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan)
+  const visibleCount = Math.ceil(containerHeight / itemHeight)
+  const end = Math.min(totalItems, start + visibleCount + overscan * 2)
+  
+  return { start, end }
+}
+
+// Efficient event filtering with caching
+export const createEventFilter = memoize((
+  events: CalendarEvent[],
+  startDate: Date,
+  endDate: Date
+) => {
+  return events.filter(event => {
+    const eventStart = new Date(event.startDate)
+    const eventEnd = new Date(event.endDate)
+    
+    return eventStart <= endDate && eventEnd >= startDate
+  })
+})
+
+// Batch DOM updates for better performance
+export function batchDOMUpdates(callback: () => void) {
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(callback)
   } else {
-    return "rounded-none" // No rounded corners
+    setTimeout(callback, 0)
   }
 }
 
-/**
- * Check if an event is a multi-day event
- */
-export function isMultiDayEvent(event: CalendarEvent): boolean {
-  const eventStart = new Date(event.startDate)
-  const eventEnd = new Date(event.endDate)
-  return event.allDay || eventStart.getDate() !== eventEnd.getDate()
-}
-
-/**
- * Filter events for a specific day
- */
-export function getEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  return events
-    .filter(event => {
-      const eventStart = new Date(event.startDate)
-      return isSameDay(day, eventStart)
-    })
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-}
-
-/**
- * Sort events with multi-day events first, then by start time
- */
-export function sortEvents(events: CalendarEvent[]): CalendarEvent[] {
-  return [...events].sort((a, b) => {
-    const aIsMultiDay = isMultiDayEvent(a)
-    const bIsMultiDay = isMultiDayEvent(b)
-
-    if (aIsMultiDay && !bIsMultiDay) return -1
-    if (!aIsMultiDay && bIsMultiDay) return 1
-
-    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+// Memory cleanup utilities
+export function cleanupEventListeners(
+  element: HTMLElement,
+  events: Array<{ type: string; handler: EventListener }>
+) {
+  events.forEach(({ type, handler }) => {
+    element.removeEventListener(type, handler)
   })
 }
 
-/**
- * Get multi-day events that span across a specific day (but don't start on that day)
- */
-export function getSpanningEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  return events.filter(event => {
-    if (!isMultiDayEvent(event)) return false
+// Optimize color calculations
+export const getOptimizedColorClasses = memoize((color: string) => {
+  const colorMap: Record<string, any> = {
+    sky: {
+      bg: 'bg-sky-200 dark:bg-sky-700',
+      border: 'border-sky-400 dark:border-sky-500',
+      text: 'text-sky-800 dark:text-sky-100',
+      hover: 'hover:bg-sky-300 dark:hover:bg-sky-600'
+    },
+    emerald: {
+      bg: 'bg-emerald-200 dark:bg-emerald-700',
+      border: 'border-emerald-400 dark:border-emerald-500',
+      text: 'text-emerald-800 dark:text-emerald-100',
+      hover: 'hover:bg-emerald-300 dark:hover:bg-emerald-600'
+    },
+    violet: {
+      bg: 'bg-violet-200 dark:bg-violet-700',
+      border: 'border-violet-400 dark:border-violet-500',
+      text: 'text-violet-800 dark:text-violet-100',
+      hover: 'hover:bg-violet-300 dark:hover:bg-violet-600'
+    },
+    rose: {
+      bg: 'bg-rose-200 dark:bg-rose-700',
+      border: 'border-rose-400 dark:border-rose-500',
+      text: 'text-rose-800 dark:text-rose-100',
+      hover: 'hover:bg-rose-300 dark:hover:bg-rose-600'
+    },
+    amber: {
+      bg: 'bg-amber-200 dark:bg-amber-700',
+      border: 'border-amber-400 dark:border-amber-500',
+      text: 'text-amber-800 dark:text-amber-100',
+      hover: 'hover:bg-amber-300 dark:hover:bg-amber-600'
+    },
+    orange: {
+      bg: 'bg-orange-200 dark:bg-orange-700',
+      border: 'border-orange-400 dark:border-orange-500',
+      text: 'text-orange-800 dark:text-orange-100',
+      hover: 'hover:bg-orange-300 dark:hover:bg-orange-600'
+    }
+  }
+  
+  return colorMap[color] || colorMap.sky
+})
 
-    const eventStart = new Date(event.startDate)
-    const eventEnd = new Date(event.endDate)
-
-    // Only include if it's not the start day but is either the end day or a middle day
-    return !isSameDay(day, eventStart) && (isSameDay(day, eventEnd) || (day > eventStart && day < eventEnd))
-  })
-}
-
-/**
- * Get all events visible on a specific day (starting, ending, or spanning)
- */
-export function getAllEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  return events.filter(event => {
-    const eventStart = new Date(event.startDate)
-    const eventEnd = new Date(event.endDate)
-    return isSameDay(day, eventStart) || isSameDay(day, eventEnd) || (day > eventStart && day < eventEnd)
-  })
-}
-
-/**
- * Get all events for a day (for agenda view)
- */
-export function getAgendaEventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  return events
-    .filter(event => {
-      const eventStart = new Date(event.startDate)
-      const eventEnd = new Date(event.endDate)
-      return isSameDay(day, eventStart) || isSameDay(day, eventEnd) || (day > eventStart && day < eventEnd)
-    })
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+// Performance monitoring
+export function measurePerformance<T>(
+  name: string,
+  fn: () => T
+): T {
+  if (typeof performance !== 'undefined') {
+    const start = performance.now()
+    const result = fn()
+    const end = performance.now()
+    console.log(`${name} took ${end - start} milliseconds`)
+    return result
+  }
+  return fn()
 }

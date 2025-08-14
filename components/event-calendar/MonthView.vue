@@ -1,111 +1,192 @@
 <script setup lang="ts">
-import { ref, watch, type Ref } from "vue"
-import { endOfDay, format, startOfDay } from "date-fns" // Added newDate
-import { useDragAndDrop, type VueParentConfig } from "@formkit/drag-and-drop/vue"
-import type { DragendEvent } from "@formkit/drag-and-drop"
-import type { CalendarEvent, MonthViewDay } from "./types"
-import DayEventsOverflowPopup from "./DayEventsOverflowPopup.vue"
-import { Button } from "@/components/ui/button"
-import { Popover, PopoverTrigger } from "@/components/ui/popover"
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { format } from "date-fns";
+import type { CalendarEvent, MonthViewDay } from "./types";
+import DayEventsOverflowPopup from "./DayEventsOverflowPopup.vue";
+import LocationDisplay from "./LocationDisplay.vue";
+import { useColorManager } from "./composables/useColorManager";
+import { useDragAndDropSystem } from "./composables/useDragAndDrop";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverTrigger } from "@/components/ui/popover";
 
 const props = defineProps<{
-  days: MonthViewDay[]
-  // pixelsPerHour?: number; // Not directly used here, can be removed if not needed for D&D config
-}>()
+  days: MonthViewDay[];
+}>();
 
 const emit = defineEmits<{
-  (e: "openAddModal", date: Date, isAllDaySlot?: boolean, allDayTargetDate?: Date): void
-  (e: "openEditModal" | "eventUpdate", event: CalendarEvent): void
-}>()
+  (
+    e: "openAddModal",
+    date: Date,
+    isAllDaySlot?: boolean,
+    allDayTargetDate?: Date
+  ): void;
+  (e: "openEditModal" | "eventUpdate", event: CalendarEvent): void;
+}>();
 
 // --- Overflow Popup State ---
-const MAX_VISIBLE_EVENTS_IN_MONTH_CELL = 2 // Configurable
-const overflowPopupOpenForDateKey = ref<string | null>(null)
-const overflowPopupTargetRef = ref<HTMLElement | null>(null)
+const MAX_VISIBLE_EVENTS_IN_MONTH_CELL = 2; // Configurable
+const overflowPopupOpenForDateKey = ref<string | null>(null);
+const overflowPopupTargetRef = ref<HTMLElement | null>(null);
+
+// Initialize enhanced drag and drop system
+const { createDragConfig, formatEventDuration, createDroppableZone, createDraggableEvent } = useDragAndDropSystem()
 
 interface MonthDndInstance {
-  parentRef: Ref<HTMLElement | null>
-  values: Ref<CalendarEvent[]> // This is the reactive array from useDragAndDrop
-  updateConfig: (config: Partial<VueParentConfig<CalendarEvent>>) => void
+  dayZone: ReturnType<typeof createDroppableZone>
+  dayConfig: ReturnType<typeof createDragConfig>
 }
-const dndDayCellInstances = ref<Record<string, MonthDndInstance>>({})
+const dndDayCellInstances = ref<Record<string, MonthDndInstance>>({});
 
-const getDndConfigForDayCell = (dayDate: Date): Partial<VueParentConfig<CalendarEvent>> => ({
-  group: "calendarEventsMonth",
-  // dragHandle: '.drag-handle', // Add this class to your event items if you want drag handles
-  onDragend: (event: DragendEvent) => {
-    const droppedEvent = event.detail.targetData.value
-    const targetParentEl = event.detail.targetData.parent.el
-    const targetDateStr = targetParentEl.dataset.dateKey // Ensure this data attribute is on the parent
-
-    if (droppedEvent && targetDateStr) {
-      const newDateForEvent = startOfDay(new Date(targetDateStr))
-      const duration = new Date(droppedEvent.end).getTime() - new Date(droppedEvent.start).getTime()
-
-      // If original was timed and less than a day, and dropped on month, consider making it all day for that day
-      // or keep its original time if that's desired behavior for month view drops.
-      // This example makes it an all-day event for the new date.
-      const newStart = newDateForEvent
-      const newEnd = new Date(newStart.getTime() + duration) // Maintain duration if it was already allDay
-      // Or endOfDay(newStart) if converting timed to allDay
-
-      const updatedEvent: CalendarEvent = {
-        ...droppedEvent,
-        startDate: newStart,
-        endDate: droppedEvent.allDay ? newEnd : endOfDay(newStart), // If originally timed, span full new day
-        allDay: true,
-      }
-      emit("eventUpdate", updatedEvent)
-    }
-  },
-})
+const getDndConfigForDayCell = (
+  dayDate: Date
+) => 
+  createDragConfig(
+    `month-${format(dayDate, "yyyy-MM-dd")}`,
+    'day-cell',
+    format(dayDate, "yyyy-MM-dd"),
+    (updatedEvent: CalendarEvent) => emit("eventUpdate", updatedEvent),
+    60 // pixelsPerHour not really used in month view, but required for interface
+  )
 
 watch(
   () => props.days,
-  newDays => {
-    const newInstances: Record<string, MonthDndInstance> = {}
-    newDays.forEach(day => {
-      const key = format(day.date, "yyyy-MM-dd")
-      // IMPORTANT: useDragAndDrop expects a Ref<T[]> for its first argument if you want it to be reactive
-      // to external changes to that list, or it manages its own internal list if given a plain array.
-      // Here, we give it a new ref each time props.days changes, effectively re-initializing.
-      const dayEventsRef = ref([...day.events])
-
-      const [parentRef, dndReactiveValues, updateConfigFn] = useDragAndDrop(
-        dayEventsRef, // Pass the ref of events for this specific day cell
-        getDndConfigForDayCell(day.date)
-      )
-      newInstances[key] = { parentRef, values: dndReactiveValues, updateConfig: updateConfigFn }
-    })
-    dndDayCellInstances.value = newInstances
+  (newDays) => {
+    if (!newDays || newDays.length === 0) {
+      dndDayCellInstances.value = {}
+      return
+    }
+    
+    const newInstances: Record<string, MonthDndInstance> = {};
+    newDays.forEach((day) => {
+      const key = format(day.date, "yyyy-MM-dd");
+      
+      try {
+        // Create drag config for this day
+        const dayConfig = getDndConfigForDayCell(day.date)
+        
+        // Create droppable zone
+        const dayZone = createDroppableZone(dayConfig)
+        
+        newInstances[key] = {
+          dayZone,
+          dayConfig,
+        };
+      } catch (error) {
+        console.error(`Error setting up drag and drop for day ${key}:`, error)
+      }
+    });
+    dndDayCellInstances.value = newInstances;
   },
-  { deep: true, immediate: true }
-)
+  { deep: true }
+);
 
-const getVisibleEvents = (dayKey: string) => {
-  const events = dndDayCellInstances.value[dayKey]?.values.value || []
-  return events.slice(0, MAX_VISIBLE_EVENTS_IN_MONTH_CELL)
+onMounted(() => {
+  // Initialize drag and drop on client side only
+  if (!props.days || props.days.length === 0) {
+    return;
+  }
+  
+  const newInstances: Record<string, MonthDndInstance> = {};
+  props.days.forEach((day) => {
+    const key = format(day.date, "yyyy-MM-dd");
+    
+    try {
+      // Create drag config for this day
+      const dayConfig = getDndConfigForDayCell(day.date);
+      
+      // Create droppable zone
+      const dayZone = createDroppableZone(dayConfig);
+      
+      newInstances[key] = {
+        dayZone,
+        dayConfig,
+      };
+    } catch (error) {
+      console.error(`Error setting up drag and drop for day ${key}:`, error);
+    }
+  });
+  dndDayCellInstances.value = newInstances;
+});
+
+// Note: Now using direct props data instead of drag-and-drop managed events for better reliability
+
+// Drag handlers for events
+const handleEventDragStart = (event: CalendarEvent, dragEvent: DragEvent) => {
+  if (!dragEvent.dataTransfer) return
+  
+  dragEvent.dataTransfer.setData('application/json', JSON.stringify(event))
+  dragEvent.dataTransfer.effectAllowed = 'move'
+  
+  document.body.classList.add('dragging-event')
 }
 
-const getOverflowEvents = (dayKey: string) => {
-  const events = dndDayCellInstances.value[dayKey]?.values.value || []
-  return events.slice(MAX_VISIBLE_EVENTS_IN_MONTH_CELL)
+const handleEventDragEnd = (event: CalendarEvent, dragEvent: DragEvent) => {
+  document.body.classList.remove('dragging-event')
+}
+
+// Drop zone handlers
+const handleDragEnter = (dragEvent: DragEvent, dayKey: string) => {
+  if (dragEvent.currentTarget instanceof HTMLElement) {
+    dragEvent.currentTarget.classList.add('drop-zone-active')
+  }
+}
+
+const handleDragLeave = (dragEvent: DragEvent, dayKey: string) => {
+  if (dragEvent.currentTarget instanceof HTMLElement) {
+    dragEvent.currentTarget.classList.remove('drop-zone-active')
+  }
+}
+
+const handleDrop = (dragEvent: DragEvent, dayKey: string, dayDate: Date) => {
+  dragEvent.preventDefault()
+  
+  if (dragEvent.currentTarget instanceof HTMLElement) {
+    dragEvent.currentTarget.classList.remove('drop-zone-active')
+  }
+
+  const draggedData = dragEvent.dataTransfer?.getData('application/json')
+  if (!draggedData) return
+
+  try {
+    const droppedEvent: CalendarEvent = JSON.parse(draggedData)
+    const config = getDndConfigForDayCell(dayDate)
+    config.handleDrop(droppedEvent)
+  } catch (error) {
+    console.error('❌ Error handling drop:', error)
+  }
 }
 
 const toggleOverflowPopup = (dayKey: string, event: MouseEvent) => {
   if (overflowPopupOpenForDateKey.value === dayKey) {
-    overflowPopupOpenForDateKey.value = null
-    overflowPopupTargetRef.value = null
+    overflowPopupOpenForDateKey.value = null;
+    overflowPopupTargetRef.value = null;
   } else {
-    overflowPopupOpenForDateKey.value = dayKey
-    overflowPopupTargetRef.value = event.currentTarget as HTMLElement
+    overflowPopupOpenForDateKey.value = dayKey;
+    overflowPopupTargetRef.value = event.currentTarget as HTMLElement;
   }
-}
+};
 
 const handleOverflowEventEdit = (event: CalendarEvent) => {
-  emit("openEditModal", event)
-  overflowPopupOpenForDateKey.value = null // Close popup
-}
+  emit("openEditModal", event);
+  overflowPopupOpenForDateKey.value = null; // Close popup
+};
+
+// Initialize color manager for getting color classes
+const eventsComputed = computed(() => {
+  const allEvents: CalendarEvent[] = [];
+  props.days.forEach((day) => {
+    allEvents.push(...day.events);
+  });
+  return allEvents;
+});
+const { getColorClasses } = useColorManager(eventsComputed);
+
+// Cleanup on unmount
+onUnmounted(() => {
+  dndDayCellInstances.value = {}
+  overflowPopupOpenForDateKey.value = null
+  overflowPopupTargetRef.value = null
+})
 </script>
 
 <template>
@@ -120,38 +201,66 @@ const handleOverflowEventEdit = (event: CalendarEvent) => {
     <div
       v-for="day in days"
       :key="day.date.toISOString()"
-      :ref="dndDayCellInstances[format(day.date, 'yyyy-MM-dd')]?.parentRef"
+      :ref="dndDayCellInstances[format(day.date, 'yyyy-MM-dd')]?.dayZone.elementRef"
       :data-date-key="format(day.date, 'yyyy-MM-dd')"
+      data-type="day-cell"
+      @dragover.prevent
+      @dragenter="handleDragEnter($event, format(day.date, 'yyyy-MM-dd'))"
+      @dragleave="handleDragLeave($event, format(day.date, 'yyyy-MM-dd'))"
+      @drop="handleDrop($event, format(day.date, 'yyyy-MM-dd'), day.date)"
       :class="[
         'p-1 border-r border-b border-border min-h-[100px] relative group',
         day.isCurrentMonth ? 'bg-background' : 'bg-muted/30',
         { 'bg-blue-50 dark:bg-blue-900/30': day.isToday },
       ]"
-      @click.self="emit('openAddModal', day.date, true, day.date)"
     >
-      <span :class="['text-sm', { 'font-bold text-blue-600 dark:text-blue-400': day.isToday }]">{{
-        format(day.date, "d")
-      }}</span>
+      <span
+        :class="[
+          'text-sm',
+          { 'font-bold text-blue-600 dark:text-blue-400': day.isToday },
+        ]"
+        >{{ format(day.date, "d") }}</span
+      >
 
       <div class="mt-1 space-y-1">
         <div
-          v-for="eventItem in getVisibleEvents(format(day.date, 'yyyy-MM-dd'))"
+          v-for="eventItem in day.events.slice(0, MAX_VISIBLE_EVENTS_IN_MONTH_CELL)"
           :key="eventItem.id"
           :class="[
-            'p-1 text-xs rounded cursor-pointer drag-handle truncate',
-            `bg-${eventItem.color}-200 border-${eventItem.color}-400 text-${eventItem.color}-800 dark:bg-${eventItem.color}-700 dark:border-${eventItem.color}-500 dark:text-${eventItem.color}-100`,
+            'p-2 text-xs rounded cursor-move event-content border-2 transition-all duration-200 hover:shadow-md select-none relative group',
+            eventItem.color
+              ? getColorClasses(eventItem.color)
+              : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
           ]"
+          draggable="true"
+          :data-event-id="eventItem.id"
           @click="emit('openEditModal', eventItem)"
+          @dragstart="handleEventDragStart(eventItem, $event)"
+          @dragend="handleEventDragEnd(eventItem, $event)"
         >
-          {{ eventItem.title }}
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-1 min-w-0">
+              <span class="truncate flex-1 font-medium">{{ eventItem.title }}</span>
+              <LocationDisplay
+                v-if="eventItem.location"
+                :location="eventItem.location"
+                :compact="true"
+                :show-tooltip="true"
+                :icon-size="10"
+              />
+            </div>
+            <div v-if="formatEventDuration(eventItem)" class="event-duration text-opacity-75">
+              {{ formatEventDuration(eventItem) }}
+            </div>
+          </div>
         </div>
 
         <Popover
-          v-if="getOverflowEvents(format(day.date, 'yyyy-MM-dd')).length > 0"
+          v-if="day.events.length > MAX_VISIBLE_EVENTS_IN_MONTH_CELL"
           :open="overflowPopupOpenForDateKey === format(day.date, 'yyyy-MM-dd')"
           @update:open="
-            isOpen => {
-              if (!isOpen) overflowPopupOpenForDateKey = null
+            (isOpen) => {
+              if (!isOpen) overflowPopupOpenForDateKey = null;
             }
           "
         >
@@ -160,14 +269,18 @@ const handleOverflowEventEdit = (event: CalendarEvent) => {
               variant="ghost"
               size="sm"
               class="w-full text-xs h-auto py-0.5 px-1 justify-start text-muted-foreground hover:bg-muted/50"
-              @click.stop="toggleOverflowPopup(format(day.date, 'yyyy-MM-dd'), $event)"
+              @click.stop="
+                toggleOverflowPopup(format(day.date, 'yyyy-MM-dd'), $event)
+              "
             >
-              + {{ getOverflowEvents(format(day.date, "yyyy-MM-dd")).length }} more
+              + {{ day.events.length - MAX_VISIBLE_EVENTS_IN_MONTH_CELL }} more
             </Button>
           </PopoverTrigger>
           <DayEventsOverflowPopup
-            v-if="overflowPopupOpenForDateKey === format(day.date, 'yyyy-MM-dd')"
-            :events="getOverflowEvents(format(day.date, 'yyyy-MM-dd'))"
+            v-if="
+              overflowPopupOpenForDateKey === format(day.date, 'yyyy-MM-dd')
+            "
+            :events="day.events.slice(MAX_VISIBLE_EVENTS_IN_MONTH_CELL)"
             :date="day.date"
             @edit-event="handleOverflowEventEdit"
             @close="overflowPopupOpenForDateKey = null"
@@ -177,10 +290,12 @@ const handleOverflowEventEdit = (event: CalendarEvent) => {
       <Button
         variant="ghost"
         size="sm"
-        class="absolute top-0 right-0 opacity-0 group-hover:opacity-100"
+        class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-opacity"
         @click="emit('openAddModal', day.date, true, day.date)"
-        >+</Button
+        :title="`Add event on ${format(day.date, 'MMM d')}`"
       >
+        <Icon name="lucide:plus" size="14" />
+      </Button>
     </div>
   </div>
 </template>

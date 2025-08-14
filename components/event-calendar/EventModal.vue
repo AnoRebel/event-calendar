@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { watch } from "vue"
+import { ref, computed, watch } from "vue"
+import { onKeyStroke } from '@vueuse/core'
 import { useForm } from "@tanstack/vue-form"
 import { format, addHours, isBefore } from "date-fns"
 import { v4 as uuidv4 } from "uuid"
@@ -38,8 +39,25 @@ const emit = defineEmits<{
   (e: "deleteEvent", eventId: string): void
 }>()
 
+// Handle ESC key to close modal
+onKeyStroke('Escape', (e) => {
+  if (props.isOpen) {
+    e.preventDefault()
+    emit('update:isOpen', false)
+  }
+})
+
 const startDateOpen = ref(false)
 const endDateOpen = ref(false)
+const error = ref<string | null>(null)
+
+const setError = (message: string) => {
+  error.value = message
+}
+
+const clearError = () => {
+  error.value = null
+}
 
 const formatTimeForInput = (date: Date) => {
   const hours = date.getHours().toString().padStart(2, "0")
@@ -126,8 +144,8 @@ const form = useForm({
     const end = new Date(value.endDate)
 
     if (!value.allDay) {
-      const [startHours = 0, startMinutes = 0] = value.startTime.split(":").map(Number)
-      const [endHours = 0, endMinutes = 0] = value.endTime.split(":").map(Number)
+      const [startHours = 0, startMinutes = 0] = (value.startTime || "09:00").split(":").map(Number)
+      const [endHours = 0, endMinutes = 0] = (value.endTime || "10:00").split(":").map(Number)
 
       if (startHours < StartHour || startHours > EndHour || endHours < StartHour || endHours > EndHour) {
         setError(`Selected time must be between ${StartHour}:00 and ${EndHour}:00`)
@@ -149,22 +167,13 @@ const form = useForm({
 
     // Use generic title if empty
     const eventTitle = value.title.trim() ? value.title : "(no title)"
-    // Ensure dates are proper Date objects
-    const submittedEvent = {
+    // Ensure dates are proper Date objects and use correct field names
+    const submittedEvent: CalendarEvent = {
       ...value,
-      start: new Date(value.startDate),
-      end: new Date(value.endDate),
-    }
-    /* {
-      id: event?.id || "",
       title: eventTitle,
-      description,
-      start,
-      end,
-      allDay,
-      location,
-      color,
-    } */
+      startDate: start,
+      endDate: end,
+    }
     emit("submitEvent", submittedEvent, props.mode)
     closePopup()
   },
@@ -175,7 +184,8 @@ watch(
   () => [props.isOpen, props.mode, props.eventData, props.targetDate, props.isAllDayFromCell],
   ([isOpenNew, modeNew, eventDataNew, targetDateNew, isAllDayNew]) => {
     if (isOpenNew) {
-      if (modeNew === "edit" && eventDataNew) {
+      clearError() // Clear any previous errors when opening modal
+      if (modeNew === "edit" && eventDataNew && typeof eventDataNew === 'object' && 'startDate' in eventDataNew) {
         form.reset({
           ...eventDataNew,
           startDate: new Date(eventDataNew.startDate), // Ensure Date objects
@@ -185,15 +195,18 @@ watch(
         })
       } else {
         // 'add' mode or reset
+        const targetDate = targetDateNew && targetDateNew instanceof Date ? targetDateNew : new Date()
         form.reset({
           id: "",
           title: "",
           description: "",
-          startDate: targetDateNew ? new Date(targetDateNew) : new Date(),
-          endDate: targetDateNew ? addHours(new Date(targetDateNew), 1) : addHours(new Date(), 1),
-          allDay: isAllDayNew || false,
-          color: "sky",
+          startDate: targetDate,
+          endDate: addHours(targetDate, 1),
+          allDay: Boolean(isAllDayNew),
+          color: "sky" as EventColor,
           location: "",
+          startTime: `${DefaultStartHour}:00`,
+          endTime: `${DefaultEndHour}:00`,
         })
       }
     }
@@ -299,7 +312,6 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                       <Calendar
                         mode="single"
                         :model-value="field.state.value"
-                        :date="form.getFieldValue('startDate')"
                         @update:model-value="
                           date => {
                             if (date) {
@@ -373,7 +385,6 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                       <Calendar
                         mode="single"
                         :model-value="field.state.value"
-                        :date="form.getFieldValue('endDate')"
                         :min-value="form.getFieldValue('startDate')"
                         @update:model-value="
                           date => {
@@ -433,15 +444,31 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
           <form.Field name="location">
             <template #default="{ field }">
               <div class="*:not-first:mt-1.5">
-                <Label :for="field.name">Location</Label>
-                <Input
-                  :id="field.name"
-                  :name="field.name"
-                  :model-value="field.state.value"
-                  placeholder="Event location"
-                  @blur="field.handleBlur"
-                  @update:model-value="field.handleChange"
-                />
+                <Label :for="field.name" class="flex items-center gap-2">
+                  <Icon name="lucide:map-pin" size="14" class="text-muted-foreground" />
+                  Location
+                </Label>
+                <div class="relative">
+                  <Input
+                    :id="field.name"
+                    :name="field.name"
+                    :model-value="field.state.value"
+                    placeholder="Add event location"
+                    class="pl-9"
+                    @blur="field.handleBlur"
+                    @update:model-value="field.handleChange"
+                  />
+                  <Icon
+                    name="lucide:map-pin"
+                    size="16"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
+                  />
+                </div>
+                <!-- Location preview -->
+                <div v-if="field.state.value?.trim()" class="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-md p-2">
+                  <Icon name="lucide:map-pin" size="14" class="shrink-0" />
+                  <span class="truncate">{{ field.state.value }}</span>
+                </div>
                 <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
                   {{ field.state.meta.errors.join(", ") }}
                 </p>

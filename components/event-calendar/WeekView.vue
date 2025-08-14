@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, watch, type Ref } from "vue"
-import { format, startOfDay, endOfDay } from "date-fns" // Added newDate
-import { useDragAndDrop, type VueParentConfig } from "@formkit/drag-and-drop/vue"
-import type { DragendEvent } from "@formkit/drag-and-drop"
+import { ref, computed, watch, onMounted } from "vue"
+import { format } from "date-fns"
 import type { CalendarEvent, DayColumnData, TimeSlot } from "./types"
 import { useCalendarUtils } from "./composables/useCalendarUtils"
+import LocationDisplay from "./LocationDisplay.vue"
+import EventResizeHandle from "./EventResizeHandle.vue"
+import { useColorManager } from "./composables/useColorManager"
+import { useDragAndDropSystem } from "./composables/useDragAndDrop"
+import { throttle, debounce } from "./utils"
+import { Button } from "@/components/ui/button"
 
 const props = defineProps<{
   weekDaysData: DayColumnData[]
@@ -18,13 +22,105 @@ const emit = defineEmits<{
 
 const { getEventStyle, generateTimeSlots, getDropTime } = useCalendarUtils()
 
-interface DndZoneInstance {
-  parentRef: Ref<HTMLElement | null>
-  values: Ref<CalendarEvent[]>
-  updateConfig: (config: Partial<VueParentConfig<CalendarEvent>>) => void
+// Initialize color manager
+const allEventsComputed = computed(() => {
+  const allEvents: CalendarEvent[] = []
+  props.weekDaysData.forEach(day => {
+    allEvents.push(...day.allDayEvents, ...day.timedEventsRaw)
+  })
+  return allEvents
+})
+
+const { getColorClasses } = useColorManager(allEventsComputed)
+
+// Initialize enhanced drag and drop system
+const { createDragConfig, formatEventDuration, calculateEventHeight, createDroppableZone, createDraggableEvent } = useDragAndDropSystem()
+
+// Resize event handlers with performance optimization
+const handleResizeStart = (event: CalendarEvent) => {
+  // Handle resize start
 }
-const dndAllDayInstances = ref<Record<string, DndZoneInstance>>({})
-const dndTimedInstances = ref<Record<string, DndZoneInstance>>({})
+
+const handleResize = throttle((event: CalendarEvent) => {
+  // Update the event immediately for visual feedback
+  emit('eventUpdate', event)
+}, 16) // ~60fps
+
+const handleResizeEnd = debounce((event: CalendarEvent) => {
+  // Final update
+  emit('eventUpdate', event)
+}, 100)
+
+// Drag handlers for events
+const handleEventDragStart = (event: CalendarEvent, dragEvent: DragEvent) => {
+  if (!dragEvent.dataTransfer) return
+  
+  dragState.value.isDragging = true
+  dragState.value.draggedEventId = event.id
+  
+  dragEvent.dataTransfer.setData('application/json', JSON.stringify(event))
+  dragEvent.dataTransfer.effectAllowed = 'move'
+  
+  document.body.classList.add('dragging-event')
+}
+
+const handleEventDragEnd = (event: CalendarEvent, dragEvent: DragEvent) => {
+  dragState.value.isDragging = false
+  dragState.value.draggedEventId = null
+  document.body.classList.remove('dragging-event')
+}
+
+// Drop zone handlers
+const handleDragEnter = (dragEvent: DragEvent, dateKey: string, zoneType: string) => {
+  if (dragEvent.currentTarget instanceof HTMLElement) {
+    dragEvent.currentTarget.classList.add('drop-zone-active')
+  }
+  dragState.value.currentDropZone = `${zoneType}-${dateKey}`
+}
+
+const handleDragLeave = (dragEvent: DragEvent, dateKey: string, zoneType: string) => {
+  if (dragEvent.currentTarget instanceof HTMLElement) {
+    dragEvent.currentTarget.classList.remove('drop-zone-active')
+  }
+  dragState.value.currentDropZone = null
+}
+
+const handleDrop = (dragEvent: DragEvent, dateKey: string, zoneType: string) => {
+  dragEvent.preventDefault()
+  
+  if (dragEvent.currentTarget instanceof HTMLElement) {
+    dragEvent.currentTarget.classList.remove('drop-zone-active')
+  }
+
+  const draggedData = dragEvent.dataTransfer?.getData('application/json')
+  if (!draggedData) return
+
+  try {
+    const droppedEvent: CalendarEvent = JSON.parse(draggedData)
+    const config = getDndConfigForWeekZone(dateKey, zoneType as "allDay" | "timed")
+    config.handleDrop(droppedEvent)
+  } catch (error) {
+    console.error('❌ Error handling drop:', error)
+  }
+}
+
+interface DndZoneInstance {
+  allDayZone: ReturnType<typeof createDroppableZone>
+  timedZone: ReturnType<typeof createDroppableZone>
+  allDayConfig: ReturnType<typeof createDragConfig>
+  timedConfig: ReturnType<typeof createDragConfig>
+}
+
+const dndInstances = ref<Record<string, DndZoneInstance>>({})
+
+// Enhanced drag state for visual feedback
+const dragState = ref({
+  isDragging: false,
+  draggedEventId: null as string | null,
+  validDropZones: [] as string[],
+  currentDropZone: null as string | null,
+  dragPreview: null as { x: number; y: number; event: CalendarEvent } | null,
+})
 
 const timeSlotsForView = computed<TimeSlot[]>(() => {
   if (props.weekDaysData.length > 0) {
@@ -47,75 +143,65 @@ const processedWeekDaysData = computed(() => {
 const getDndConfigForWeekZone = (
   dateKey: string,
   zoneType: "allDay" | "timed"
-): Partial<VueParentConfig<CalendarEvent>> => ({
-  group: "calendarEventsWeek",
-  // dragHandle: '.drag-handle',
-  onDragend: (event: DragendEvent) => {
-    const droppedEvent = event.detail.targetData.value
-    const targetParentEl = event.detail.targetData.parent.el
-    // The dateKey for the target should be derived from targetParentEl.dataset.dateKey
-    // For simplicity, assuming 'dateKey' is the one passed during config creation.
-    // A more robust way is to read dataset from targetParentEl if possible.
-    const dropTargetDateKey = targetParentEl.dataset.dateKey || dateKey
-
-    if (!droppedEvent || !dropTargetDateKey) return
-
-    let newStart: Date
-    let newEnd: Date
-    const duration = new Date(droppedEvent.end).getTime() - new Date(droppedEvent.start).getTime()
-    const baseDateOfDrop = newDate(dropTargetDateKey)
-
-    // Determine target zone type from the element itself if possible, or rely on zoneType passed to config
-    const actualZoneType =
-      targetParentEl.dataset.type === "allDay" ? "allDay" : targetParentEl.dataset.type === "timed" ? "timed" : zoneType
-
-    if (actualZoneType === "allDay") {
-      newStart = startOfDay(baseDateOfDrop)
-      newEnd = droppedEvent.allDay ? new Date(newStart.getTime() + duration) : endOfDay(baseDateOfDrop)
-      emit("eventUpdate", { ...droppedEvent, startDate: newStart, endDate: newEnd, allDay: true })
-    } else {
-      // 'timed'
-      newStart = getDropTime(
-        event.detail.nativeEvent as PointerEvent,
-        targetParentEl,
-        baseDateOfDrop,
-        props.pixelsPerHour
-      )
-      newEnd = new Date(newStart.getTime() + duration)
-      emit("eventUpdate", { ...droppedEvent, startDate: newStart, endDate: newEnd, allDay: false })
-    }
-  },
-})
+) => 
+  createDragConfig(
+    `week-${zoneType}-${dateKey}`,
+    zoneType === "allDay" ? "all-day" : "timed",
+    dateKey,
+    (updatedEvent: CalendarEvent) => emit("eventUpdate", updatedEvent),
+    props.pixelsPerHour || 60
+  )
 
 watch(
   () => props.weekDaysData,
   newWeekData => {
-    const newAllDayDnd: Record<string, DndZoneInstance> = {}
-    const newTimedDnd: Record<string, DndZoneInstance> = {}
+    const newDndInstances: Record<string, DndZoneInstance> = {}
 
     newWeekData.forEach(day => {
-      // All-day zone
-      const allDayEventsRef = ref([...day.allDayEvents])
-      const [adParentRef, adValues, adUpdateConfig] = useDragAndDrop(
-        allDayEventsRef,
-        getDndConfigForWeekZone(day.dateKey, "allDay")
-      )
-      newAllDayDnd[day.dateKey] = { parentRef: adParentRef, values: adValues, updateConfig: adUpdateConfig }
+      // Create drag configs for each zone
+      const allDayConfig = getDndConfigForWeekZone(day.dateKey, "allDay")
+      const timedConfig = getDndConfigForWeekZone(day.dateKey, "timed")
+      
+      // Create droppable zones
+      const allDayZone = createDroppableZone(allDayConfig)
+      const timedZone = createDroppableZone(timedConfig)
 
-      // Timed zone
-      const timedEventsRef = ref([...day.timedEventsRaw])
-      const [tParentRef, tValues, tUpdateConfig] = useDragAndDrop(
-        timedEventsRef,
-        getDndConfigForWeekZone(day.dateKey, "timed")
-      )
-      newTimedDnd[day.dateKey] = { parentRef: tParentRef, values: tValues, updateConfig: tUpdateConfig }
+      newDndInstances[day.dateKey] = {
+        allDayZone,
+        timedZone,
+        allDayConfig,
+        timedConfig
+      }
     })
 
-    dndAllDayInstances.value = newAllDayDnd
-    dndTimedInstances.value = newTimedDnd
+    dndInstances.value = newDndInstances
   },
-  { deep: true, immediate: true }
+  { deep: true }
 )
+
+onMounted(() => {
+  // Initialize drag and drop on client side only
+  const newDndInstances: Record<string, DndZoneInstance> = {}
+
+  props.weekDaysData.forEach(day => {
+    // Create drag configs for each zone
+    const allDayConfig = getDndConfigForWeekZone(day.dateKey, "allDay")
+    const timedConfig = getDndConfigForWeekZone(day.dateKey, "timed")
+    
+    // Create droppable zones
+    const allDayZone = createDroppableZone(allDayConfig)
+    const timedZone = createDroppableZone(timedConfig)
+
+    newDndInstances[day.dateKey] = {
+      allDayZone,
+      timedZone,
+      allDayConfig,
+      timedConfig
+    }
+  })
+
+  dndInstances.value = newDndInstances
+})
 </script>
 
 <template>
@@ -139,31 +225,61 @@ watch(
           {{ day.dayLabel }}
         </div>
         <div
-          :ref="dndAllDayInstances[day.dateKey]?.parentRef"
+          :ref="dndInstances[day.dateKey]?.allDayZone.elementRef"
           :data-date-key="day.dateKey"
           data-type="allDay"
-          class="min-h-[30px] space-y-0.5"
-          @click.self="emit('openAddModal', day.date, true, day.date)"
+          @dragover.prevent
+          @dragenter="handleDragEnter($event, day.dateKey, 'allDay')"
+          @dragleave="handleDragLeave($event, day.dateKey, 'allDay')"
+          @drop="handleDrop($event, day.dateKey, 'allDay')"
+          :class="[
+            'min-h-[30px] space-y-0.5 transition-colors duration-200',
+            {
+              'bg-blue-100/50 dark:bg-blue-800/30 ring-2 ring-blue-300 dark:ring-blue-600': 
+                dragState.isDragging && dragState.currentDropZone === `allDay-${day.dateKey}`,
+              'bg-green-50/30 dark:bg-green-900/20': 
+                dragState.isDragging && dragState.validDropZones.includes(`allday-${day.dateKey}`)
+            }
+          ]"
         >
           <div
-            v-for="event in dndAllDayInstances[day.dateKey]?.values.value || []"
+            v-for="event in day.allDayEvents"
             :key="event.id"
             :class="[
-              'p-1 text-xs rounded cursor-pointer mb-0.5 drag-handle',
-              `bg-${event.color}-200 border-${event.color}-400 text-${event.color}-800 dark:bg-${event.color}-700 dark:border-${event.color}-500 dark:text-${event.color}-100`,
+              'p-1 text-xs rounded cursor-move mb-0.5 event-content border transition-all duration-200 hover:shadow-sm select-none',
+              event.color ? getColorClasses(event.color) : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
             ]"
-            @click="emit('openEditModal', event)"
+            draggable="true"
+            @dragstart="handleEventDragStart(event, $event)"
+            @dragend="handleEventDragEnd(event, $event)"
+            @click.stop="emit('openEditModal', event)"
           >
-            {{ event.title }}
+            <div class="space-y-0.5 drag-handle">
+              <div class="flex items-center gap-1 min-w-0">
+                <span class="truncate flex-1 font-medium">{{ event.title }}</span>
+                <LocationDisplay
+                  v-if="event.location"
+                  :location="event.location"
+                  :compact="true"
+                  :show-tooltip="true"
+                  :icon-size="10"
+                />
+              </div>
+              <div v-if="formatEventDuration(event)" class="event-duration text-opacity-75">
+                {{ formatEventDuration(event) }}
+              </div>
+            </div>
           </div>
         </div>
         <Button
           variant="ghost"
-          size="xs"
-          class="absolute top-1 right-1 opacity-0 group-hover:opacity-100"
+          size="sm"
+          class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-opacity"
           @click="emit('openAddModal', day.date, true, day.date)"
-          >+</Button
+          :title="`Add event on ${day.dayLabel}`"
         >
+          <Icon name="lucide:plus" size="14" />
+        </Button>
       </div>
     </div>
 
@@ -184,12 +300,22 @@ watch(
         <div
           v-for="day in processedWeekDaysData"
           :key="`timedcol-${day.dateKey}`"
-          :ref="dndTimedInstances[day.dateKey]?.parentRef"
+          :ref="dndInstances[day.dateKey]?.timedZone.elementRef"
           :data-date-key="day.dateKey"
           data-type="timed"
+          @dragover.prevent
+          @dragenter="handleDragEnter($event, day.dateKey, 'timed')"
+          @dragleave="handleDragLeave($event, day.dateKey, 'timed')"
+          @drop="handleDrop($event, day.dateKey, 'timed')"
           :class="[
-            'flex-1 border-r border-border relative min-w-[120px]',
-            { 'bg-blue-50/50 dark:bg-blue-900/20': day.isToday },
+            'flex-1 border-r border-border relative min-w-[120px] transition-colors duration-200',
+            { 
+              'bg-blue-50/50 dark:bg-blue-900/20': day.isToday,
+              'bg-blue-100/50 dark:bg-blue-800/30 ring-2 ring-blue-300 dark:ring-blue-600': 
+                dragState.isDragging && dragState.currentDropZone === `timed-${day.dateKey}`,
+              'bg-green-50/30 dark:bg-green-900/20': 
+                dragState.isDragging && dragState.validDropZones.includes(`timed-${day.dateKey}`) && dragState.currentDropZone !== `timed-${day.dateKey}`
+            },
           ]"
         >
           <div
@@ -198,26 +324,82 @@ watch(
             :data-slot-time="slot.dateTimeStr"
             :style="{ height: `${pixelsPerHour}px` }"
             class="border-b border-dashed border-border/50 dark:border-border/30 box-border relative"
-            @click.self="emit('openAddModal', slot.time, false, day.date)"
           />
 
           <template v-for="styledEvent in day.timedEventsStyled" :key="styledEvent.id">
             <div
-              v-if="dndTimedInstances[day.dateKey]?.values?.find(e => e.id === styledEvent.id)"
-              :style="styledEvent.style"
+              v-if="true"
+              :style="{ 
+                ...styledEvent.style, 
+                height: `${calculateEventHeight(styledEvent, props.pixelsPerHour || 60)}px` 
+              }"
               :class="[
-                'absolute p-1 text-xs rounded cursor-pointer drag-handle overflow-hidden z-[5]',
-                `bg-${styledEvent.color}-300 border-${styledEvent.color}-500 text-${styledEvent.color}-900 dark:bg-${styledEvent.color}-600 dark:border-${styledEvent.color}-400 dark:text-${styledEvent.color}-50`,
+                'absolute p-1 text-xs rounded cursor-move event-content overflow-hidden z-[5] border transition-all duration-200 hover:shadow-md hover:z-10 select-none',
+                styledEvent.color ? getColorClasses(styledEvent.color) : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
               ]"
-              @click="
-                emit('openEditModal', dndTimedInstances[day.dateKey]!.values?.find(e => e.id === styledEvent.id)!)
-              "
+              draggable="true"
+              @dragstart="handleEventDragStart(styledEvent, $event)"
+              @dragend="handleEventDragEnd(styledEvent, $event)"
+              @click.stop="emit('openEditModal', styledEvent)"
             >
-              <div class="font-semibold">{{ styledEvent.title }}</div>
-              <div class="opacity-80">
-                {{ format(new Date(styledEvent.startDate), "p") }} - {{ format(new Date(styledEvent.endDate), "p") }}
+              <!-- Resize handles for all sides -->
+              <EventResizeHandle
+                :event="styledEvent"
+                position="top"
+                :enabled="!styledEvent.allDay"
+                :pixels-per-hour="pixelsPerHour || 60"
+                @resize-start="handleResizeStart"
+                @resize="handleResize"
+                @resize-end="handleResizeEnd"
+              />
+              
+              <EventResizeHandle
+                :event="styledEvent"
+                position="left"
+                :enabled="true"
+                :pixels-per-hour="pixelsPerHour || 60"
+                @resize-start="handleResizeStart"
+                @resize="handleResize"
+                @resize-end="handleResizeEnd"
+              />
+              
+              <EventResizeHandle
+                :event="styledEvent"
+                position="right"
+                :enabled="true"
+                :pixels-per-hour="pixelsPerHour || 60"
+                @resize-start="handleResizeStart"
+                @resize="handleResize"
+                @resize-end="handleResizeEnd"
+              />
+              
+              <div class="space-y-0.5 drag-handle">
+                <div class="font-semibold truncate">{{ styledEvent.title }}</div>
+                <div class="opacity-80 text-xs">
+                  {{ format(new Date(styledEvent.startDate), "p") }} - {{ format(new Date(styledEvent.endDate), "p") }}
+                </div>
+                <div v-if="formatEventDuration(styledEvent)" class="event-duration">
+                  {{ formatEventDuration(styledEvent) }}
+                </div>
+                <LocationDisplay
+                  v-if="styledEvent.location"
+                  :location="styledEvent.location"
+                  :compact="true"
+                  :show-tooltip="true"
+                  :icon-size="10"
+                />
               </div>
-              <div v-if="styledEvent.location" class="truncate opacity-70">{{ styledEvent.location }}</div>
+              
+              <!-- Resize handle for bottom -->
+              <EventResizeHandle
+                :event="styledEvent"
+                position="bottom"
+                :enabled="!styledEvent.allDay"
+                :pixels-per-hour="pixelsPerHour || 60"
+                @resize-start="handleResizeStart"
+                @resize="handleResize"
+                @resize-end="handleResizeEnd"
+              />
             </div>
           </template>
         </div>
