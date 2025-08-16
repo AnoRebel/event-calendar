@@ -10,11 +10,15 @@ export interface CalendarEvent {
   allDay?: boolean
   color?: EventColor
   location?: string
+  status?: EventStatus
+  timezone?: string
   // Recurring event support
   isRecurring?: boolean
   recurringPattern?: RecurringPattern
   recurringId?: string // Links recurring instances
 }
+
+export type EventStatus = "confirmed" | "cancelled" | "tentative" | "past"
 
 export interface RecurringPattern {
   type: 'daily' | 'weekly' | 'monthly' | 'yearly'
@@ -69,4 +73,17 @@ export interface LocationData {
   address: string
   coordinates?: { lat: number; lng: number }
   placeId?: string // For future Google Places integration
+}
+
+// External Calendar Integration Types
+export interface ExternalEventSource {
+  provider: 'google' | 'outlook' | 'local'
+  externalId?: string
+  calendarId?: string
+  lastSyncTime?: Date
+}
+
+export interface CalendarEventWithSource extends CalendarEvent {
+  source?: ExternalEventSource
+  isReadOnly?: boolean // For external events that can't be modified locally
 }

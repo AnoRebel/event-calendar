@@ -67,11 +67,11 @@ const getDndConfigForDayZone = (zoneType: "allDay" | "timed") => {
 // Initialize drag and drop instances immediately
 const initializeDragAndDrop = () => {
   const { createDroppableZone } = useDragAndDropSystem()
-  
+
   // Create drag configs for each zone
   const allDayConfig = getDndConfigForDayZone("allDay")
   const timedConfig = getDndConfigForDayZone("timed")
-  
+
   // Create droppable zones
   const allDayZone = createDroppableZone(allDayConfig)
   const timedZone = createDroppableZone(timedConfig)
@@ -80,7 +80,7 @@ const initializeDragAndDrop = () => {
     allDayZone,
     timedZone,
     allDayConfig,
-    timedConfig
+    timedConfig,
   }
 }
 
@@ -91,7 +91,7 @@ onMounted(() => {
 
 watch(
   () => props.dayData,
-  (newDayData) => {
+  newDayData => {
     // Reinitialize drag and drop with new data
     initializeDragAndDrop()
   },
@@ -106,7 +106,8 @@ const allEventsComputed = computed(() => {
 const { getColorClasses } = useColorManager(allEventsComputed)
 
 // Initialize enhanced drag and drop system
-const { createDragConfig, formatEventDuration, calculateEventHeight, createDroppableZone, createDraggableEvent } = useDragAndDropSystem()
+const { createDragConfig, formatEventDuration, calculateEventHeight, createDroppableZone, createDraggableEvent } =
+  useDragAndDropSystem()
 
 // Resize event handlers with performance optimization
 const handleResizeStart = (event: CalendarEvent) => {
@@ -115,51 +116,51 @@ const handleResizeStart = (event: CalendarEvent) => {
 
 const handleResize = throttle((event: CalendarEvent) => {
   // Update the event immediately for visual feedback
-  emit('eventUpdate', event)
+  emit("eventUpdate", event)
 }, 16) // ~60fps
 
 // Drag handlers for events
 const handleEventDragStart = (event: CalendarEvent, dragEvent: DragEvent) => {
   if (!dragEvent.dataTransfer) return
-  
+
   dragState.value.isDragging = true
   dragState.value.draggedEventId = event.id
-  
-  dragEvent.dataTransfer.setData('application/json', JSON.stringify(event))
-  dragEvent.dataTransfer.effectAllowed = 'move'
-  
-  document.body.classList.add('dragging-event')
+
+  dragEvent.dataTransfer.setData("application/json", JSON.stringify(event))
+  dragEvent.dataTransfer.effectAllowed = "move"
+
+  document.body.classList.add("dragging-event")
 }
 
 const handleEventDragEnd = (event: CalendarEvent, dragEvent: DragEvent) => {
   dragState.value.isDragging = false
   dragState.value.draggedEventId = null
-  document.body.classList.remove('dragging-event')
+  document.body.classList.remove("dragging-event")
 }
 
 // Drop zone handlers
 const handleDragEnter = (dragEvent: DragEvent, zoneType: string) => {
   if (dragEvent.currentTarget instanceof HTMLElement) {
-    dragEvent.currentTarget.classList.add('drop-zone-active')
+    dragEvent.currentTarget.classList.add("drop-zone-active")
   }
   dragState.value.currentDropZone = `${zoneType}-${props.dayData.dateKey}`
 }
 
 const handleDragLeave = (dragEvent: DragEvent, zoneType: string) => {
   if (dragEvent.currentTarget instanceof HTMLElement) {
-    dragEvent.currentTarget.classList.remove('drop-zone-active')
+    dragEvent.currentTarget.classList.remove("drop-zone-active")
   }
   dragState.value.currentDropZone = null
 }
 
 const handleDrop = (dragEvent: DragEvent, zoneType: string) => {
   dragEvent.preventDefault()
-  
+
   if (dragEvent.currentTarget instanceof HTMLElement) {
-    dragEvent.currentTarget.classList.remove('drop-zone-active')
+    dragEvent.currentTarget.classList.remove("drop-zone-active")
   }
 
-  const draggedData = dragEvent.dataTransfer?.getData('application/json')
+  const draggedData = dragEvent.dataTransfer?.getData("application/json")
   if (!draggedData) return
 
   try {
@@ -167,13 +168,13 @@ const handleDrop = (dragEvent: DragEvent, zoneType: string) => {
     const config = getDndConfigForDayZone(zoneType as "allDay" | "timed")
     config.handleDrop(droppedEvent)
   } catch (error) {
-    console.error('❌ Error handling drop:', error)
+    console.error("❌ Error handling drop:", error)
   }
 }
 
 const handleResizeEnd = debounce((event: CalendarEvent) => {
   // Final update
-  emit('eventUpdate', event)
+  emit("eventUpdate", event)
 }, 100)
 
 // Note: Cleanup is handled automatically by Vue's reactivity system
@@ -211,11 +212,13 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
           :class="[
             'min-h-[30px] space-y-0.5 transition-colors duration-200',
             {
-              'bg-blue-100/50 dark:bg-blue-800/30 ring-2 ring-blue-300 dark:ring-blue-600': 
+              'bg-blue-100/50 dark:bg-blue-800/30 ring-2 ring-blue-300 dark:ring-blue-600':
                 dragState.isDragging && dragState.currentDropZone === 'allday-zone',
-              'bg-green-50/30 dark:bg-green-900/20': 
-                dragState.isDragging && dragState.validDropZones.includes('allday-zone') && dragState.currentDropZone !== 'allday-zone'
-            }
+              'bg-green-50/30 dark:bg-green-900/20':
+                dragState.isDragging &&
+                dragState.validDropZones.includes('allday-zone') &&
+                dragState.currentDropZone !== 'allday-zone',
+            },
           ]"
         >
           <div
@@ -223,7 +226,9 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
             :key="event.id"
             :class="[
               'p-1 text-xs rounded cursor-move mb-0.5 event-content border transition-all duration-200 hover:shadow-sm select-none',
-              event.color ? getColorClasses(event.color) : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
+              event.color
+                ? getColorClasses(event.color)
+                : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
             ]"
             draggable="true"
             @dragstart="handleEventDragStart(event, $event)"
@@ -250,7 +255,7 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
         <Button
           variant="ghost"
           size="sm"
-          class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-opacity"
+          class="cursor-pointer absolute top-1 right-1 opacity-0 group-hover:opacity-100 h-6 w-6 p-0 text-muted-foreground hover:text-foreground transition-opacity dark:hover:text-primary"
           @click="emit('openAddModal', processedDayData.date, true, processedDayData.date)"
           :title="`Add event on ${format(processedDayData.date, 'MMM d')}`"
         >
@@ -282,12 +287,14 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
         @drop="handleDrop($event, 'timed')"
         :class="[
           'flex-1 border-r border-border relative transition-colors duration-200',
-          { 
+          {
             'bg-blue-50/50 dark:bg-blue-900/20': processedDayData.isToday,
-            'bg-blue-100/50 dark:bg-blue-800/30 ring-2 ring-blue-300 dark:ring-blue-600': 
+            'bg-blue-100/50 dark:bg-blue-800/30 ring-2 ring-blue-300 dark:ring-blue-600':
               dragState.isDragging && dragState.currentDropZone === 'timed-zone',
-            'bg-green-50/30 dark:bg-green-900/20': 
-              dragState.isDragging && dragState.validDropZones.includes('timed-zone') && dragState.currentDropZone !== 'timed-zone'
+            'bg-green-50/30 dark:bg-green-900/20':
+              dragState.isDragging &&
+              dragState.validDropZones.includes('timed-zone') &&
+              dragState.currentDropZone !== 'timed-zone',
           },
         ]"
       >
@@ -302,13 +309,15 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
         <template v-for="styledEvent in processedDayData.timedEventsStyled" :key="styledEvent.id">
           <div
             v-if="true"
-            :style="{ 
-              ...styledEvent.style, 
-              height: `${calculateEventHeight(styledEvent, props.pixelsPerHour)}px` 
+            :style="{
+              ...styledEvent.style,
+              height: `${calculateEventHeight(styledEvent, props.pixelsPerHour)}px`,
             }"
             :class="[
               'absolute p-1 text-xs rounded cursor-move event-content z-[5] border transition-all duration-200 hover:shadow-md hover:z-10 select-none',
-              styledEvent.color ? getColorClasses(styledEvent.color) : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
+              styledEvent.color
+                ? getColorClasses(styledEvent.color)
+                : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
             ]"
             draggable="true"
             @dragstart="handleEventDragStart(styledEvent, $event)"
@@ -325,7 +334,7 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
               @resize="handleResize"
               @resize-end="handleResizeEnd"
             />
-            
+
             <EventResizeHandle
               :event="styledEvent"
               position="left"
@@ -335,7 +344,7 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
               @resize="handleResize"
               @resize-end="handleResizeEnd"
             />
-            
+
             <EventResizeHandle
               :event="styledEvent"
               position="right"
@@ -345,7 +354,7 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
               @resize="handleResize"
               @resize-end="handleResizeEnd"
             />
-            
+
             <div class="space-y-0.5">
               <div class="font-semibold truncate">{{ styledEvent.title }}</div>
               <div class="opacity-80 text-xs">
@@ -362,7 +371,7 @@ const handleResizeEnd = debounce((event: CalendarEvent) => {
                 :icon-size="10"
               />
             </div>
-            
+
             <!-- Resize handle for bottom -->
             <EventResizeHandle
               :event="styledEvent"

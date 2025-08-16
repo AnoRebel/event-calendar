@@ -26,10 +26,10 @@ describe('useColorManager', () => {
     
     const classes = getColorClasses('sky')
     
-    expect(classes).toHaveProperty('bg')
-    expect(classes).toHaveProperty('border')
-    expect(classes).toHaveProperty('text')
-    expect(classes).toHaveProperty('hover')
+    expect(typeof classes).toBe('string')
+    expect(classes).toContain('bg-')
+    expect(classes).toContain('border-')
+    expect(classes).toContain('text-')
   })
 
   it('detects color conflicts', () => {

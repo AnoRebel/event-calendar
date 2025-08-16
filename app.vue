@@ -2,11 +2,14 @@
 import { ref, onMounted } from "vue"
 import { addDays, setHours, setMinutes, subDays, addWeeks, addMonths } from "date-fns"
 import type { CalendarEvent } from "@/components/event-calendar/types"
+import { Toaster } from "@/components/ui/sonner"
 import { toast } from "vue-sonner"
+import "vue-sonner/style.css"
 
 // Reactive events state for full CRUD operations
 const events = ref<CalendarEvent[]>([])
 const isLoading = ref(false)
+const { isDark } = useDarkMode()
 
 // Initialize with comprehensive sample data showcasing all enhanced features
 const initializeSampleEvents = (): CalendarEvent[] => [
@@ -39,8 +42,9 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     allDay: true,
     color: "orange",
     location: "Executive Conference Room",
+    status: "cancelled",
   },
-  
+
   // Today's events (for testing drag and drop)
   {
     id: "4",
@@ -78,7 +82,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "rose",
     location: "Test Location 2",
   },
-  
+
   // Tomorrow's events
   {
     id: "6",
@@ -88,6 +92,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     endDate: setMinutes(setHours(addDays(new Date(), 1), 13), 15),
     color: "emerald",
     location: "Downtown Cafe & Bistro",
+    status: "tentative",
   },
   {
     id: "7",
@@ -98,7 +103,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "violet",
     location: "Development Office",
   },
-  
+
   // Multi-day events
   {
     id: "8",
@@ -110,7 +115,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "violet",
     location: "Multiple Locations",
   },
-  
+
   // Future events with overlaps for testing
   {
     id: "9",
@@ -148,7 +153,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "amber",
     location: "Design Studio",
   },
-  
+
   // Weekly recurring pattern simulation
   {
     id: "13",
@@ -168,7 +173,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "emerald",
     location: "Marketing Department",
   },
-  
+
   // Monthly events
   {
     id: "15",
@@ -189,7 +194,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "sky",
     location: "Grand Conference Center",
   },
-  
+
   // Long-term events
   {
     id: "17",
@@ -210,7 +215,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "violet",
     location: "Convention Center",
   },
-  
+
   // Events for testing edge cases and advanced features
   {
     id: "19",
@@ -230,7 +235,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "emerald",
     location: "Company Gym",
   },
-  
+
   // Additional events to showcase enhanced features
   {
     id: "21",
@@ -277,7 +282,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     color: "amber",
     location: "Quiet Zone",
   },
-  
+
   // Multi-day and multi-hour events for testing
   {
     id: "26",
@@ -303,7 +308,7 @@ const initializeSampleEvents = (): CalendarEvent[] => [
     title: "Weekend Retreat",
     description: "Team building and strategic planning weekend",
     startDate: setMinutes(setHours(addDays(new Date(), 12), 18), 0), // Friday 6 PM
-    endDate: setMinutes(setHours(addDays(new Date(), 14), 16), 0),   // Sunday 4 PM
+    endDate: setMinutes(setHours(addDays(new Date(), 14), 16), 0), // Sunday 4 PM
     color: "rose",
     location: "Mountain Resort",
   },
@@ -324,24 +329,24 @@ const handleEventAdd = async (newEvent: CalendarEvent) => {
   try {
     // Simulate async operation for realistic UX
     await new Promise(resolve => setTimeout(resolve, 300))
-    
+
     // Validate event data
     if (!newEvent.title?.trim()) {
       throw new Error("Event title is required")
     }
-    
+
     if (newEvent.startDate >= newEvent.endDate && !newEvent.allDay) {
       throw new Error("End time must be after start time")
     }
-    
+
     events.value.push(newEvent)
     toast.success(`Event "${newEvent.title}" created successfully`, {
-      description: newEvent.location ? `Location: ${newEvent.location}` : undefined
+      description: newEvent.location ? `Location: ${newEvent.location}` : undefined,
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to create event"
     toast.error("Error creating event", {
-      description: errorMessage
+      description: errorMessage,
     })
   } finally {
     isLoading.value = false
@@ -353,29 +358,29 @@ const handleEventUpdate = async (updatedEvent: CalendarEvent) => {
   try {
     // Simulate async operation
     await new Promise(resolve => setTimeout(resolve, 200))
-    
+
     const index = events.value.findIndex(event => event.id === updatedEvent.id)
     if (index === -1) {
       throw new Error("Event not found")
     }
-    
+
     // Validate updated event data
     if (!updatedEvent.title?.trim()) {
       throw new Error("Event title is required")
     }
-    
+
     if (updatedEvent.startDate >= updatedEvent.endDate && !updatedEvent.allDay) {
       throw new Error("End time must be after start time")
     }
-    
+
     events.value[index] = updatedEvent
     toast.success(`Event "${updatedEvent.title}" updated successfully`, {
-      description: "Changes have been saved"
+      description: "Changes have been saved",
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to update event"
     toast.error("Error updating event", {
-      description: errorMessage
+      description: errorMessage,
     })
   } finally {
     isLoading.value = false
@@ -387,24 +392,24 @@ const handleEventDelete = async (eventId: string) => {
   try {
     // Simulate async operation
     await new Promise(resolve => setTimeout(resolve, 150))
-    
+
     const eventIndex = events.value.findIndex(event => event.id === eventId)
     if (eventIndex === -1) {
       throw new Error("Event not found")
     }
-    
+
     const deletedEvent = events.value[eventIndex]
     events.value.splice(eventIndex, 1)
-    
+
     if (deletedEvent) {
       toast.success(`Event "${deletedEvent.title}" deleted successfully`, {
-        description: "Event has been permanently removed"
+        description: "Event has been permanently removed",
       })
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Failed to delete event"
     toast.error("Error deleting event", {
-      description: errorMessage
+      description: errorMessage,
     })
   } finally {
     isLoading.value = false
@@ -420,13 +425,20 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-background">
     <NuxtRouteAnnouncer />
-    <div class="container mx-auto p-4 md:p-6 lg:p-8">
-      <EventCalendar 
-        :events="events" 
+    <div class="mx-auto p-4 md:p-6 lg:p-8">
+      <EventCalendar
+        :events="events"
         @event-add="handleEventAdd"
         @event-update="handleEventUpdate"
         @event-delete="handleEventDelete"
       />
     </div>
+    <Toaster
+      class="pointer-events-auto"
+      :theme="isDark ? 'dark' : 'light'"
+      position="top-right"
+      richColors
+      closeButton
+    />
   </div>
 </template>

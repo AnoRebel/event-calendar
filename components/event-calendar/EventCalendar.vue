@@ -23,6 +23,8 @@ import type { CalendarEvent, ViewMode, MonthViewDay, DayColumnData } from "./typ
 import { useEventFiltering } from "./composables/useEventFiltering"
 import { useErrorHandling } from "./composables/useErrorHandling"
 import { useColorManager } from "./composables/useColorManager"
+import { useTimezone } from "./composables/useTimezone"
+import { useRecurringEvents } from "./composables/useRecurringEvents"
 import MonthView from "./MonthView.vue"
 import WeekView from "./WeekView.vue"
 import DayView from "./DayView.vue"
@@ -30,7 +32,7 @@ import AgendaView from "./AgendaView.vue"
 import EventModal from "./EventModal.vue"
 import DragDropVisualFeedback from "./DragDropVisualFeedback.vue"
 import { Button } from "@/components/ui/button"
-import DarkModeToggle from "@/components/ui/DarkModeToggle.vue"
+import { default as DarkModeToggle } from "@/components/ui/dark-mode-toggle"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,7 +58,45 @@ const localEvents = shallowRef<CalendarEvent[]>([])
 
 // Initialize composables
 const { handleError, validateEvent, withErrorHandling } = useErrorHandling()
-const eventsComputed = computed(() => localEvents.value)
+const { processEventsWithTimezone, convertEventToDisplayTimezone } = useTimezone()
+
+// Process events with timezone conversion for display
+const rawEventsComputed = computed(() => localEvents.value)
+const eventsWithTimezone = processEventsWithTimezone(rawEventsComputed)
+
+// Initialize recurring events processing
+const { expandRecurringEventsInRange } = useRecurringEvents(eventsWithTimezone)
+
+// Expand recurring events based on current view
+const eventsComputed = computed(() => {
+  const viewStartDate = computed(() => {
+    if (currentView.value === "month") {
+      return startOfWeek(startOfMonth(currentDate.value), { weekStartsOn: 1 })
+    } else if (currentView.value === "week") {
+      return startOfWeek(currentDate.value, { weekStartsOn: 1 })
+    } else if (currentView.value === "day") {
+      return startOfDay(currentDate.value)
+    } else {
+      // agenda view - show 3 months
+      return startOfMonth(currentDate.value)
+    }
+  })
+  
+  const viewEndDate = computed(() => {
+    if (currentView.value === "month") {
+      return endOfWeek(endOfMonth(currentDate.value), { weekStartsOn: 1 })
+    } else if (currentView.value === "week") {
+      return endOfWeek(currentDate.value, { weekStartsOn: 1 })
+    } else if (currentView.value === "day") {
+      return endOfDay(currentDate.value)
+    } else {
+      // agenda view - show 3 months
+      return endOfMonth(addMonths(currentDate.value, 2))
+    }
+  })
+  
+  return expandRecurringEventsInRange(viewStartDate.value, viewEndDate.value).value
+})
 const { getEventsForDay, getAllDayEventsForDay, getTimedEventsForDay, getAgendaEvents, isToday } = useEventFiltering(eventsComputed)
 
 // Initialize color manager
@@ -130,7 +170,8 @@ const openAddModalHandler = (date?: Date, isAllDaySlot?: boolean, allDayTargetDa
 
 const openEditModalHandler = (event: CalendarEvent) => {
   popupMode.value = "edit"
-  eventForPopup.value = { ...event } // Pass a copy
+  // Convert event to display timezone for editing
+  eventForPopup.value = convertEventToDisplayTimezone({ ...event })
   popupTargetDate.value = null // Not needed for edit
   popupIsAllDayFromCell.value = event.allDay || false
   isEventModalOpen.value = true
@@ -186,7 +227,7 @@ const monthViewDaysComputed = computed<MonthViewDay[]>(() => {
     date: day,
     isCurrentMonth: day.getMonth() === currentMonth,
     isToday: isSameDay(day, todayValue),
-    events: localEvents.value.filter(event => {
+    events: eventsComputed.value.filter(event => {
       const eventStartDay = startOfDay(new Date(event.startDate))
       // For month view, an event ending at midnight on day X is still considered to be on day X-1
       const eventEndDay = new Date(event.endDate)
