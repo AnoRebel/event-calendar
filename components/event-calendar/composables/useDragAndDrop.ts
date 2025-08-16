@@ -1,5 +1,5 @@
 import { ref, type Ref, reactive } from "vue"
-import { useDraggable, useDroppable, type UseDraggableOptions, type UseDroppableOptions } from "@vue-dnd-kit/core"
+import { useDraggable, useDroppable, type IUseDragOptions, type IUseDropOptions } from "@vue-dnd-kit/core"
 import { startOfDay, endOfDay, addMinutes, setHours, setMinutes } from "date-fns"
 import type { CalendarEvent } from "../types"
 import { useCalendarUtils } from "./useCalendarUtils"
@@ -182,38 +182,17 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
       }
     }
 
-    const { elementRef, isOver } = useDroppable({
+    const { elementRef, isOvered: isOver } = useDroppable({
       id: `zone-${config.zoneId}`,
       disabled: config.disabled,
-      events: {
-        onDragOver: (event) => {
-          event.preventDefault()
-          if (event.currentTarget instanceof HTMLElement) {
-            event.currentTarget.classList.add('drop-zone-active')
+      onDrop: (store, payload) => {
+        try {
+          const droppedEvent = payload.draggedEl?.eventData as CalendarEvent
+          if (droppedEvent && config.handleDrop) {
+            config.handleDrop(droppedEvent)
           }
-        },
-        onDragLeave: (event) => {
-          if (event.currentTarget instanceof HTMLElement) {
-            event.currentTarget.classList.remove('drop-zone-active')
-          }
-        },
-        onDrop: (event) => {
-          event.preventDefault()
-          if (event.currentTarget instanceof HTMLElement) {
-            event.currentTarget.classList.remove('drop-zone-active')
-          }
-
-          const draggedData = event.dataTransfer?.getData('application/json')
-          if (draggedData) {
-            try {
-              const droppedEvent: CalendarEvent = JSON.parse(draggedData)
-              if (droppedEvent && config.handleDrop) {
-                config.handleDrop(droppedEvent)
-              }
-            } catch (error) {
-              console.error('Failed to parse drag data:', error)
-            }
-          }
+        } catch (error) {
+          console.error('Failed to handle drop:', error)
         }
       }
     })

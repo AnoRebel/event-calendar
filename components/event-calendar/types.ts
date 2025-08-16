@@ -25,6 +25,7 @@ export interface RecurringPattern {
   interval: number // Every N days/weeks/months/years
   endDate?: Date
   count?: number // Number of occurrences
+  endsNever?: boolean // For events that never end
   daysOfWeek?: number[] // For weekly: 0=Sunday, 1=Monday, etc.
   dayOfMonth?: number // For monthly
   monthOfYear?: number // For yearly

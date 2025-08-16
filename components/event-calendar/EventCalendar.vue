@@ -18,13 +18,18 @@ import {
   startOfDay,
   endOfDay,
 } from "date-fns"
-import { v4 as uuidv4 } from "uuid"
+import { useCompatibility } from "./composables/useCompatibility"
 import type { CalendarEvent, ViewMode, MonthViewDay, DayColumnData } from "./types"
 import { useEventFiltering } from "./composables/useEventFiltering"
-import { useErrorHandling } from "./composables/useErrorHandling"
+import { useResilientErrorHandling } from "./composables/useResilientErrorHandling"
 import { useColorManager } from "./composables/useColorManager"
 import { useTimezone } from "./composables/useTimezone"
 import { useRecurringEvents } from "./composables/useRecurringEvents"
+import { useSecurity } from "./composables/useSecurity"
+import { useEventStore } from "./composables/useEventStore"
+import { useEventAPI } from "./composables/useEventAPI"
+import { useMonitoring } from "./composables/useMonitoring"
+import { useAdvancedValidation } from "./composables/useAdvancedValidation"
 import MonthView from "./MonthView.vue"
 import WeekView from "./WeekView.vue"
 import DayView from "./DayView.vue"
@@ -56,9 +61,18 @@ const currentView = ref<ViewMode>(props.initialView || "month")
 const currentDate = ref(new Date())
 const localEvents = shallowRef<CalendarEvent[]>([])
 
-// Initialize composables
-const { handleError, validateEvent, withErrorHandling } = useErrorHandling()
+// Initialize enhanced composables
+const { handleError, withErrorHandling, performHealthCheck } = useResilientErrorHandling()
+const { performSecurityCheck, sanitizeEvent, initializeSecurity } = useSecurity()
+const { ensureUUID } = useCompatibility()
+const eventStore = useEventStore()
+const eventAPI = useEventAPI()
+const { trackCalendarPerformance, measureOperation } = useMonitoring()
+const { validateEvent, sanitizeEvent: sanitizeEventData } = useAdvancedValidation()
 const { processEventsWithTimezone, convertEventToDisplayTimezone } = useTimezone()
+
+// Initialize security and compatibility on component mount
+initializeSecurity()
 
 // Process events with timezone conversion for display
 const rawEventsComputed = computed(() => localEvents.value)
@@ -178,37 +192,74 @@ const openEditModalHandler = (event: CalendarEvent) => {
 }
 
 const handleModalSubmit = async (eventPayload: CalendarEvent, mode: "add" | "edit") => {
-  // Validate event data before processing
-  const validationErrors = validateEvent(eventPayload)
-  if (validationErrors.length > 0) {
-    handleError(validationErrors.join(', '))
-    return
-  }
-
-  await withErrorHandling(async () => {
-    if (mode === "add") {
-      // Assign unique color if not already set
-      const eventWithColor = {
-        ...eventPayload,
-        id: uuidv4(),
-        color: eventPayload.color || assignUniqueColor(eventPayload)
-      }
-      emit("eventAdd", eventWithColor)
-    } else {
-      // For edit mode, keep existing color or assign new one if needed
-      const eventWithColor = {
-        ...eventPayload,
-        color: eventPayload.color || assignUniqueColor(eventPayload)
-      }
-      emit("eventUpdate", eventWithColor)
+  await measureOperation(`event_${mode}`, async () => {
+    // Security check first
+    const securityResult = performSecurityCheck(eventPayload)
+    if (!securityResult.isSecure) {
+      await handleError(new Error('Security validation failed'), {
+        component: 'EventCalendar',
+        operation: `event_${mode}`
+      })
+      return
     }
-    isEventModalOpen.value = false // Close popup on submit
-  }, `Failed to ${mode} event`)
+
+    // Use sanitized event data
+    const sanitizedEvent = securityResult.sanitizedEvent
+
+    // Advanced validation
+    const validationResult = validateEvent(sanitizedEvent)
+    if (!validationResult.isValid) {
+      await handleError(new Error(validationResult.errors.map(e => e.message).join(', ')), {
+        component: 'EventCalendar',
+        operation: `event_${mode}_validation`
+      })
+      return
+    }
+
+    await withErrorHandling(async () => {
+      if (mode === "add") {
+        // Assign unique color if not already set
+        const eventWithColor = {
+          ...sanitizedEvent,
+          id: ensureUUID(),
+          color: sanitizedEvent.color || assignUniqueColor(sanitizedEvent)
+        }
+        
+        // Add to local store first
+        eventStore.addEvent(eventWithColor as CalendarEvent)
+        emit("eventAdd", eventWithColor as CalendarEvent)
+      } else {
+        // For edit mode, keep existing color or assign new one if needed
+        const eventWithColor = {
+          ...sanitizedEvent,
+          color: sanitizedEvent.color || assignUniqueColor(sanitizedEvent)
+        }
+        
+        // Update in local store
+        eventStore.updateEvent(eventWithColor.id as string, eventWithColor)
+        emit("eventUpdate", eventWithColor as CalendarEvent)
+      }
+      
+      isEventModalOpen.value = false // Close popup on submit
+    }, {
+      component: 'EventCalendar',
+      operation: `event_${mode}`
+    })
+  })
 }
 
-const handleModalDelete = (eventId: string) => {
-  emit("eventDelete", eventId)
-  isEventModalOpen.value = false // Close popup on delete
+const handleModalDelete = async (eventId: string) => {
+  await measureOperation('event_delete', async () => {
+    await withErrorHandling(async () => {
+      // Delete from local store
+      eventStore.deleteEvent(eventId)
+      emit("eventDelete", eventId)
+      isEventModalOpen.value = false // Close popup on delete
+    }, {
+      component: 'EventCalendar',
+      operation: 'event_delete'
+    })
+  })
 }
 
 // Data preparation for views
@@ -420,11 +471,11 @@ useKeyboardNavigation(
 
     <!-- Drag and Drop Visual Feedback -->
     <DragDropVisualFeedback
-      :is-dragging="globalDragState.isDragging"
-      :dragged-event="globalDragState.draggedEvent"
-      :valid-drop-zones="globalDragState.validDropZones.map(zone => zone.id)"
-      :current-drop-zone="globalDragState.currentDropZone?.id"
-      :drag-position="globalDragState.dragPreview ? { x: globalDragState.dragPreview.x, y: globalDragState.dragPreview.y } : { x: 0, y: 0 }"
+      :is-dragging="globalDragState?.isDragging || false"
+      :dragged-event="globalDragState?.draggedEvent"
+      :valid-drop-zones="globalDragState?.validDropZones?.map(zone => zone.id) || []"
+      :current-drop-zone="globalDragState?.currentDropZone?.id"
+      :drag-position="globalDragState?.dragPreview ? { x: globalDragState.dragPreview.x, y: globalDragState.dragPreview.y } : { x: 0, y: 0 }"
     />
   </div>
 </template>

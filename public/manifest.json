@@ -1,0 +1,75 @@
+{
+  "name": "Event Calendar",
+  "short_name": "Calendar",
+  "description": "Advanced Vue 3 Event Calendar with offline support and productivity features",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities", "business"],
+  "shortcuts": [
+    {
+      "name": "Add Event",
+      "short_name": "Add",
+      "description": "Create a new calendar event",
+      "url": "/?action=add",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "64x64"
+        }
+      ]
+    },
+    {
+      "name": "Today's Events",
+      "short_name": "Today",
+      "description": "View today's schedule",
+      "url": "/?view=day",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "64x64"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon",
+      "platform": "wide",
+      "label": "Calendar application interface"
+    }
+  ],
+  "features": [
+    "offline-support",
+    "background-sync",
+    "push-notifications",
+    "responsive-design"
+  ],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

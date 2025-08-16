@@ -4,5 +4,4 @@ import playwright from "eslint-plugin-playwright"
 
 export default withNuxt({
   // Your custom configs here
-  playwright.configs["flat/recommended"],
-})
+}, playwright.configs["flat/recommended"])

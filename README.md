@@ -62,6 +62,94 @@ _Note: Keyboard shortcuts are disabled when typing in input fields or when the e
   - Persistent theme selection via localStorage
   - Smooth color transitions across all components
 
+### 🔄 Recurring Events
+
+Advanced recurring event support with intelligent validation:
+
+- **Daily Recurrence**: Events that repeat every N days
+- **Weekly Recurrence**: Events that repeat on specific days of the week
+  - Auto-selects start date's day of week when switching to weekly
+  - Multiple days per week selection with toggle interface
+- **Monthly Recurrence**: Events that repeat on specific day of month
+  - Auto-selects start date's day when switching to monthly
+  - Handles month-end edge cases (e.g., January 31st)
+- **Yearly Recurrence**: Events that repeat annually on specific date
+  - Auto-selects start date's month and day when switching to yearly
+- **Flexible End Conditions**:
+  - **Never**: Events continue indefinitely with `endsNever` flag
+  - **After X occurrences**: Limited repetitions with count validation
+  - **On specific date**: End on a particular date with date validation
+- **Smart Form Behavior**: Automatic field population based on event start date
+- **Comprehensive Validation**: Prevents invalid recurring patterns with helpful error messages
+
+### 🔒 Security Features
+
+Enterprise-grade security implementation:
+
+- **Input Sanitization**: XSS protection with HTML sanitization
+- **Content Security Policy**: Strict CSP headers to prevent injection attacks
+- **Rate Limiting**: API endpoint protection with configurable limits
+- **Validation Framework**: Multi-layer validation with error recovery
+- **Security Headers**: HSTS, X-Frame-Options, X-Content-Type-Options
+- **Secret Management**: Secure handling of API keys and tokens
+- **Error Boundaries**: Graceful error handling without information leakage
+
+### 📊 Monitoring & Analytics
+
+Built-in observability and performance tracking:
+
+- **Performance Monitoring**: Real-time metrics collection and reporting
+- **Error Tracking**: Comprehensive error logging with context preservation
+- **User Analytics**: Privacy-focused usage analytics
+- **Health Checks**: Application health monitoring with detailed status
+- **Resilient Error Handling**: Circuit breaker patterns and error recovery
+- **Memory Management**: Performance cache with LRU eviction
+- **Debug Logging**: Detailed logging for development and troubleshooting
+
+### 🌍 Timezone & Internationalization
+
+Global-ready timezone and locale support:
+
+- **Automatic Timezone Detection**: Browser-based timezone detection
+- **Timezone Conversion**: Event display in user's local timezone
+- **DST Handling**: Daylight saving time transition support
+- **Multiple Timezone Support**: Display events from different timezones
+- **Timezone Validation**: Comprehensive timezone data validation
+- **Recurring Event Timezone Consistency**: Proper timezone handling for recurring events
+
+### 📱 Mobile & Accessibility Enhancements
+
+Mobile-first design with accessibility compliance:
+
+- **Touch Gestures**: Enhanced touch interactions for mobile devices
+- **Mobile Drag & Drop**: Touch-optimized event manipulation
+- **Screen Reader Support**: Full ARIA compliance for accessibility
+- **Keyboard Navigation**: Complete keyboard-only operation support
+- **Responsive Breakpoints**: Adaptive layouts for all screen sizes
+- **High Contrast Mode**: Support for accessibility color preferences
+
+### 🔗 External Calendar Integration
+
+Seamless integration with popular calendar services:
+
+- **Google Calendar**: Import and sync with Google Calendar
+- **Microsoft Outlook**: Exchange and Outlook.com integration
+- **Apple Calendar**: iCal format support
+- **CalDAV Protocol**: Standard calendar protocol support
+- **Conflict Resolution**: Smart handling of sync conflicts
+- **Selective Sync**: Choose which calendars to sync
+
+### ⚡ Performance Optimization
+
+Advanced performance features for large-scale deployments:
+
+- **Event Virtualization**: Efficient rendering of large event datasets
+- **Smart Caching**: LRU cache with configurable TTL
+- **Service Worker**: Offline support and background sync
+- **Code Splitting**: Lazy loading of calendar views and features
+- **Memory Management**: Automatic cleanup and garbage collection
+- **Bundle Optimization**: Tree-shaking and chunk optimization
+
 ### 🎨 Visual Enhancements
 
 - **Equal Grid Sizing**: Month view uses consistent cell dimensions for uniform layout
@@ -166,8 +254,10 @@ components/
 │   ├── WeekView.vue                  # Weekly calendar view with aligned headers
 │   ├── DayView.vue                   # Daily calendar view with drag-and-drop
 │   ├── AgendaView.vue                # Agenda list view with month navigation
-│   ├── EventModal.vue                # Event creation/editing modal with status
+│   ├── EventModal.vue                # Event creation/editing modal with recurring support
 │   ├── LocationDisplay.vue           # Location display component with tooltips
+│   ├── ColorManager.vue              # Color management and conflict detection
+│   ├── ExternalCalendarSettings.vue  # External calendar integration settings
 │   ├── DayEventsOverflowPopup.vue    # Event overflow handling
 │   ├── DragDropVisualFeedback.vue    # Visual feedback component
 │   ├── EventResizeHandle.vue         # Event resizing handles
@@ -179,17 +269,41 @@ components/
 │   │   ├── useColorManager.test.ts   # Color manager tests
 │   │   └── useEventStatus.test.ts    # Event status tests
 │   └── composables/                  # Vue composables
-│       ├── useCalendarUtils.ts       # Calendar utility composable
-│       ├── useColorManager.ts        # Color management composable
-│       ├── useDarkMode.ts           # Dark mode composable
+│       ├── useCalendarUtils.ts       # Calendar utility functions
+│       ├── useColorManager.ts        # Color management and conflict detection
 │       ├── useDragAndDrop.ts        # Enhanced drag-and-drop system
-│       ├── useErrorHandling.ts       # Error handling composable
-│       ├── useEventFiltering.ts      # Event filtering composable
+│       ├── useErrorHandling.ts       # Error handling and validation
+│       ├── useEventFiltering.ts      # Event filtering and search
 │       ├── useEventStatus.ts         # Event status management
+│       ├── useEventResize.ts         # Event resizing functionality
+│       ├── useMultiDayLayout.ts      # Multi-day event layout
+│       ├── useRecurringEvents.ts     # Recurring event processing
+│       ├── useExternalCalendar.ts    # External calendar integration
+│       ├── useTimezone.ts            # Timezone handling and conversion
+│       ├── useVirtualization.ts      # Event virtualization for performance
+│       ├── useCompatibility.ts       # Browser compatibility checks
+│       ├── useMobileEnhancement.ts   # Mobile-specific optimizations
+│       ├── useSecurity.ts            # Security validation and sanitization
+│       ├── useResilientErrorHandling.ts # Advanced error recovery
+│       ├── useMonitoring.ts          # Performance monitoring and analytics
+│       ├── useEventAPI.ts            # Event API management
+│       ├── useEventStore.ts          # Event state management
+│       ├── usePerformanceCache.ts    # Caching and performance optimization
+│       ├── useAdvancedValidation.ts  # Comprehensive validation framework
 │       └── useKeyboardNavigation.ts  # Keyboard navigation composable
 └── ui/                               # ShadCN UI components
     ├── DarkModeToggle.vue           # Dark/Light mode toggle component
     └── [other ShadCN components]    # Button, Dialog, Input, etc.
+
+server/
+└── api/                              # Server API endpoints
+    ├── health.get.ts                 # Health check endpoint
+    ├── analytics.post.ts             # Analytics data collection
+    └── errors.post.ts                # Error reporting endpoint
+
+composables/
+├── useDarkMode.ts                    # Global dark mode management
+└── useServiceWorker.ts               # Service worker management
 ```
 
 ## ShadCN Component/Block Usage
@@ -310,10 +424,14 @@ const handleEventDelete = (eventId: string) => {
 </template>
 
 <script setup lang="ts">
+import { useCompatibility } from "@/components/ui/event-calendar/composables/useCompatibility"
+// import { useCompatibility } from "@/blocks/event-calendar/composables/useCompatibility"
+
+const { ensureUUID } = useCompatibility()
 // Full configuration with advanced features
 const events = ref<CalendarEvent[]>([
   {
-    id: crypto.randomUUID(),
+    id: ensureUUID(),
     title: "Multi-day Conference",
     description: "Annual tech conference",
     startDate: new Date(2024, 0, 15, 9, 0),
@@ -410,6 +528,64 @@ export const useEventAPI = () => {
 }
 ```
 
+## API Documentation
+
+### Health Check Endpoint
+
+```typescript
+GET /api/health
+
+Response:
+{
+  "status": "healthy" | "unhealthy",
+  "uptime": number, // seconds
+  "timestamp": string,
+  "checks": {
+    "server": "healthy" | "unhealthy",
+    "memory": "healthy" | "unhealthy"
+  },
+  "version": string
+}
+```
+
+### Analytics Endpoint
+
+```typescript
+POST /api/analytics
+
+Body:
+{
+  "session": string,
+  "timestamp": string,
+  "metricsCount": number,
+  "errorsCount": number,
+  "summary": {
+    "totalMetrics": number,
+    "totalErrors": number,
+    "averagePageLoadTime": number,
+    "errorRate": number
+  }
+}
+```
+
+### Error Reporting Endpoint
+
+```typescript
+POST /api/errors
+
+Body:
+{
+  "session": string,
+  "timestamp": string,
+  "error": {
+    "message": string,
+    "stack": string,
+    "type": string,
+    "context": Record<string, any>
+  }
+}
+```
+
 ### Performance Considerations
 
 - Uses `shallowRef` for large event collections
@@ -495,7 +671,6 @@ interface CalendarEvent {
   color?: EventColor
   location?: string
   status?: EventStatus
-  // Recurring event support (future implementation)
   isRecurring?: boolean
   recurringPattern?: RecurringPattern
   recurringId?: string
@@ -507,12 +682,13 @@ type ViewMode = "month" | "week" | "day" | "agenda"
 
 interface RecurringPattern {
   type: "daily" | "weekly" | "monthly" | "yearly"
-  interval: number
+  interval: number // Every N days/weeks/months/years
   endDate?: Date
-  count?: number
-  daysOfWeek?: number[]
-  dayOfMonth?: number
-  monthOfYear?: number
+  count?: number // Number of occurrences
+  endsNever?: boolean // For events that never end
+  daysOfWeek?: number[] // For weekly: 0=Sunday, 1=Monday, etc.
+  dayOfMonth?: number // For monthly: 1-31
+  monthOfYear?: number // For yearly: 1-12
 }
 
 // Location Display Props
@@ -818,13 +994,164 @@ Smooth color transitions applied globally:
 }
 ```
 
-## Contributing
+## Development Guide
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### Prerequisites
+
+- **Bun** (recommended) or Node.js 18+
+- **TypeScript** knowledge for customization
+- Basic understanding of **Vue 3 Composition API**
+- Familiarity with **Nuxt 3/4** for advanced features
+
+### Development Scripts
+
+```bash
+# Core development
+bun run dev              # Start development server
+bun run build            # Build for production
+bun run preview          # Preview production build
+bun run generate         # Generate static site
+
+# Code quality
+bun run lint             # Run ESLint
+bun run lint:fix         # Fix ESLint issues automatically
+bun run format           # Format code with Prettier
+bun run typecheck        # Run TypeScript type checking
+
+# Testing
+bun run test             # Run unit tests
+bun run test:ui          # Run tests with UI
+bun run test:coverage    # Run tests with coverage
+bun run test:e2e         # Run end-to-end tests
+bun run test:e2e:ui      # Run E2E tests with UI
+
+# Performance & Security
+bun run performance:audit # Run Lighthouse audit
+bun run security:audit   # Run security audit
+bun run security:fix     # Fix security vulnerabilities
+
+# Docker operations
+bun run docker:build    # Build Docker image
+bun run docker:run      # Start with Docker Compose
+bun run docker:stop     # Stop Docker services
+bun run docker:logs     # View Docker logs
+```
+
+### Project Configuration
+
+Key configuration files and their purposes:
+
+- **`nuxt.config.ts`**: Main Nuxt configuration with modules, optimization, and security settings
+- **`components.json`**: ShadCN component configuration and styling preferences
+- **`tsconfig.json`**: TypeScript configuration with relaxed strictness for easier development
+- **`vitest.config.ts`**: Unit testing configuration
+- **`playwright.config.ts`**: End-to-end testing configuration
+- **`eslint.config.mjs`**: ESLint configuration with security and accessibility rules
+
+### Troubleshooting
+
+#### Common Development Issues
+
+1. **TypeScript Errors**
+
+   ```bash
+   # The project uses relaxed TypeScript settings for easier development
+   # If you encounter type errors, check tsconfig.json configuration
+   bun run typecheck
+   ```
+
+2. **Recurring Events Validation**
+
+   ```bash
+   # Weekly events require at least one day selected
+   # Monthly events require a valid day of month (1-31)
+   # Yearly events require a valid month (1-12) and day
+   ```
+
+3. **SSR Hydration Issues**
+
+   ```bash
+   # Some composables use client-side only features
+   # Check for typeof window !== 'undefined' checks
+   ```
+
+4. **Performance Issues**
+   ```bash
+   # Enable performance monitoring in development
+   # Check browser devtools for performance insights
+   bun run performance:audit
+   ```
+
+#### Build Issues
+
+1. **Memory Issues**
+
+   ```bash
+   # Increase Node.js memory limit if needed
+   NODE_OPTIONS="--max-old-space-size=4096" bun run build
+   ```
+
+2. **Dependency Conflicts**
+   ```bash
+   # Clear node_modules and reinstall
+   rm -rf node_modules bun.lock
+   bun install
+   ```
+
+### Contributing Guidelines
+
+1. **Fork and Clone**
+
+   ```bash
+   git clone https://github.com/AnoRebel/event-calendar.git
+   cd event-calendar
+   bun install
+   ```
+
+2. **Create Feature Branch**
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Development Workflow**
+
+   ```bash
+   # Start development server
+   bun run dev
+
+   # Make your changes
+   # Run tests
+   bun run test
+
+   # Check code quality
+   bun run lint
+   bun run typecheck
+   ```
+
+4. **Testing Requirements**
+   - Add unit tests for new composables
+   - Add component tests for UI changes
+   - Update E2E tests for user-facing features
+   - Ensure all tests pass before submitting
+
+5. **Code Standards**
+   - Follow existing code style and patterns
+   - Use TypeScript for type safety
+   - Add JSDoc comments for public APIs
+   - Follow Vue 3 Composition API best practices
+
+6. **Security Considerations**
+   - Sanitize user inputs
+   - Validate all data at boundaries
+   - Follow security best practices
+   - Run security audit before submitting
+
+7. **Submit Pull Request**
+   - Write clear commit messages
+   - Include tests for new features
+   - Update documentation as needed
+   - Reference related issues
 
 ## License
 

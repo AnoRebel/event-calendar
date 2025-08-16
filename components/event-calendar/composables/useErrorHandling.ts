@@ -1,31 +1,37 @@
 import { ref, type Ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { useCompatibility } from './useCompatibility'
 
 export interface CalendarError {
   id: string
-  type: 'validation' | 'network' | 'drag-drop' | 'general'
+  type: 'validation' | 'network' | 'drag-drop' | 'general' | 'security' | 'performance'
   message: string
   timestamp: Date
   context?: Record<string, any>
+  severity?: 'low' | 'medium' | 'high' | 'critical'
 }
 
 /**
- * Centralized error handling for calendar operations
+ * Legacy error handling for backward compatibility
+ * @deprecated Use useResilientErrorHandling for production features
  */
 export function useErrorHandling() {
   const errors: Ref<CalendarError[]> = ref([])
   const isLoading = ref(false)
+  const { ensureUUID } = useCompatibility()
 
   const createError = (
     type: CalendarError['type'],
     message: string,
-    context?: Record<string, any>
+    context?: Record<string, any>,
+    severity: CalendarError['severity'] = 'medium'
   ): CalendarError => ({
-    id: crypto.randomUUID(),
+    id: ensureUUID(),
     type,
     message,
     timestamp: new Date(),
-    context
+    context,
+    severity
   })
 
   const handleError = (error: CalendarError | Error | string, showToast = true) => {
@@ -94,6 +100,11 @@ export function useErrorHandling() {
 
     if (event.startDate && event.endDate && event.startDate > event.endDate) {
       validationErrors.push('End date must be after start date')
+    }
+
+    // Additional security validation
+    if (event.title && (event.title.includes('<script') || event.title.includes('javascript:'))) {
+      validationErrors.push('Invalid content in event title')
     }
 
     return validationErrors

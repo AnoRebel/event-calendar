@@ -1,0 +1,64 @@
+# Development Docker Compose Configuration
+version: '3.8'
+
+services:
+  calendar-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+      - "24678:24678" # Vite HMR
+    environment:
+      - NODE_ENV=development
+      - NUXT_DEVTOOLS=true
+      - DATABASE_URL=postgresql://dev_user:dev_password@postgres:5432/calendar_dev
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.nuxt
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - calendar-dev-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: calendar_dev
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/init-dev.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    networks:
+      - calendar-dev-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - calendar-dev-network
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    networks:
+      - calendar-dev-network
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+
+networks:
+  calendar-dev-network:
+    driver: bridge

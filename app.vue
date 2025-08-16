@@ -5,11 +5,35 @@ import type { CalendarEvent } from "@/components/event-calendar/types"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "vue-sonner"
 import "vue-sonner/style.css"
+import { useServiceWorker } from '~/composables/useServiceWorker'
+import { useCompatibility } from '~/components/event-calendar/composables/useCompatibility'
+import { useMobileEnhancement } from '~/components/event-calendar/composables/useMobileEnhancement'
+import { useMonitoring } from '~/components/event-calendar/composables/useMonitoring'
 
 // Reactive events state for full CRUD operations
 const events = ref<CalendarEvent[]>([])
 const isLoading = ref(false)
 const { isDark } = useDarkMode()
+
+// Initialize enhanced services
+const { state: swState } = useServiceWorker()
+const compatibility = useCompatibility()
+const mobileEnhancement = useMobileEnhancement()
+const monitoring = useMonitoring()
+
+// Initialize compatibility layer
+compatibility.initialize()
+
+// Set up global error handling and monitoring
+if (process.client) {
+  window.addEventListener('unhandledrejection', (event) => {
+    monitoring.recordError({
+      error: event.reason?.message || 'Unhandled promise rejection',
+      component: 'global'
+    })
+    event.preventDefault()
+  })
+}
 
 // Initialize with comprehensive sample data showcasing all enhanced features
 const initializeSampleEvents = (): CalendarEvent[] => [
@@ -419,6 +443,27 @@ const handleEventDelete = async (eventId: string) => {
 // Initialize events on component mount
 onMounted(() => {
   events.value = initializeSampleEvents()
+  
+  // Add feature detection classes to HTML
+  const featureClasses = compatibility.getFeatureClasses()
+  document.documentElement.classList.add(...featureClasses)
+})
+
+// Configure head for PWA and SEO
+useHead({
+  title: 'Event Calendar',
+  meta: [
+    { name: 'description', content: 'Advanced Vue 3 Event Calendar Application with offline support' },
+    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+    { name: 'theme-color', content: '#ffffff' },
+    { name: 'apple-mobile-web-app-capable', content: 'yes' },
+    { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+  ],
+  link: [
+    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+    { rel: 'manifest', href: '/manifest.json' },
+    { rel: 'apple-touch-icon', href: '/favicon.ico' }
+  ]
 })
 </script>
 

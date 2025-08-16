@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { SwitchRoot, SwitchThumb, useForwardPropsEmits } from 'reka-ui/switch'
+import { SwitchRoot, SwitchThumb, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
 interface SwitchProps {

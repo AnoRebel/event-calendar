@@ -243,12 +243,45 @@ const form = useForm({
       if (value.recurringEndType === "never") {
         recurringPattern.endDate = undefined
         recurringPattern.count = undefined
+        // Mark as "never" ending for validation
+        recurringPattern.endsNever = true
       } else if (value.recurringEndType === "after") {
         recurringPattern.endDate = undefined
+        recurringPattern.endsNever = false
         // count is already set from the form
       } else if (value.recurringEndType === "on") {
         recurringPattern.count = undefined
+        recurringPattern.endsNever = false
         // endDate is already set from the form
+      }
+
+      // Handle weekly events - ensure daysOfWeek is populated
+      if (recurringPattern.type === 'weekly') {
+        if (!recurringPattern.daysOfWeek || recurringPattern.daysOfWeek.length === 0) {
+          // Default to the day of the week of the start date
+          const startDayOfWeek = start.getDay()
+          recurringPattern.daysOfWeek = [startDayOfWeek]
+        }
+      }
+
+      // Handle monthly events - ensure dayOfMonth is populated
+      if (recurringPattern.type === 'monthly') {
+        if (!recurringPattern.dayOfMonth) {
+          // Default to the day of the month of the start date
+          recurringPattern.dayOfMonth = start.getDate()
+        }
+      }
+
+      // Handle yearly events - ensure monthOfYear is populated
+      if (recurringPattern.type === 'yearly') {
+        if (!recurringPattern.monthOfYear) {
+          // Default to the month of the start date (getMonth() returns 0-11, but we want 1-12)
+          recurringPattern.monthOfYear = start.getMonth() + 1
+        }
+        if (!recurringPattern.dayOfMonth) {
+          // Also set day of month for yearly events
+          recurringPattern.dayOfMonth = start.getDate()
+        }
       }
     }
 
@@ -349,6 +382,44 @@ watch(
     }
   },
   { deep: true }
+)
+
+// Watch for changes to recurring pattern type and auto-populate fields
+watch(
+  () => form.getFieldValue('recurringPattern.type'),
+  (newType, oldType) => {
+    const startDate = form.getFieldValue('startDate')
+    if (!startDate) return
+
+    const date = ensureValidDate(startDate)
+
+    if (newType === 'weekly' && oldType !== 'weekly') {
+      const currentDaysOfWeek = form.getFieldValue('recurringPattern.daysOfWeek') || []
+      if (currentDaysOfWeek.length === 0) {
+        // Auto-select the day of the week of the start date
+        const dayOfWeek = date.getDay()
+        form.setFieldValue('recurringPattern.daysOfWeek', [dayOfWeek])
+      }
+    } else if (newType === 'monthly' && oldType !== 'monthly') {
+      const currentDayOfMonth = form.getFieldValue('recurringPattern.dayOfMonth')
+      if (!currentDayOfMonth) {
+        // Auto-set the day of the month of the start date
+        form.setFieldValue('recurringPattern.dayOfMonth', date.getDate())
+      }
+    } else if (newType === 'yearly' && oldType !== 'yearly') {
+      const currentMonthOfYear = form.getFieldValue('recurringPattern.monthOfYear')
+      const currentDayOfMonth = form.getFieldValue('recurringPattern.dayOfMonth')
+      
+      if (!currentMonthOfYear) {
+        // Auto-set the month of the start date (getMonth() returns 0-11, but we want 1-12)
+        form.setFieldValue('recurringPattern.monthOfYear', date.getMonth() + 1)
+      }
+      if (!currentDayOfMonth) {
+        // Auto-set the day of the month of the start date
+        form.setFieldValue('recurringPattern.dayOfMonth', date.getDate())
+      }
+    }
+  }
 )
 
 const closePopup = () => {
