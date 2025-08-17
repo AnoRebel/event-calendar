@@ -40,6 +40,8 @@
     "@nuxt/image": "1.11.0",
     "@tailwindcss/vite": "^4.1.12",
     "@tanstack/vue-form": "^1.19.2",
+    "@vercel/analytics": "^1.5.0",
+    "@vercel/speed-insights": "^1.2.0",
     "@vue-dnd-kit/core": "^1.7.0",
     "@vueuse/core": "^13.6.0",
     "@vueuse/nuxt": "13.3.0",
@@ -60,9 +62,11 @@
   "trustedDependencies": [
     "@parcel/watcher",
     "@tailwindcss/oxide",
+    "@vercel/speed-insights",
     "esbuild",
     "sharp",
-    "unrs-resolver"
+    "unrs-resolver",
+    "vue-demi"
   ],
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.62",

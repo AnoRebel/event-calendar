@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import { Analytics } from "@vercel/analytics/nuxt"
+import { SpeedInsights } from "@vercel/speed-insights/nuxt"
 import { ref, onMounted } from "vue"
 import { addDays, setHours, setMinutes, subDays, addWeeks, addMonths } from "date-fns"
 import type { CalendarEvent } from "@/components/event-calendar/types"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "vue-sonner"
 import "vue-sonner/style.css"
-import { useServiceWorker } from '~/composables/useServiceWorker'
-import { useCompatibility } from '~/components/event-calendar/composables/useCompatibility'
-import { useMobileEnhancement } from '~/components/event-calendar/composables/useMobileEnhancement'
-import { useMonitoring } from '~/components/event-calendar/composables/useMonitoring'
+import { useServiceWorker } from "~/composables/useServiceWorker"
+import { useCompatibility } from "~/components/event-calendar/composables/useCompatibility"
+import { useMobileEnhancement } from "~/components/event-calendar/composables/useMobileEnhancement"
+import { useMonitoring } from "~/components/event-calendar/composables/useMonitoring"
 
 // Reactive events state for full CRUD operations
 const events = ref<CalendarEvent[]>([])
@@ -25,11 +27,11 @@ const monitoring = useMonitoring()
 compatibility.initialize()
 
 // Set up global error handling and monitoring
-if (process.client) {
-  window.addEventListener('unhandledrejection', (event) => {
+if (import.meta.client) {
+  window.addEventListener("unhandledrejection", event => {
     monitoring.recordError({
-      error: event.reason?.message || 'Unhandled promise rejection',
-      component: 'global'
+      error: event.reason?.message || "Unhandled promise rejection",
+      component: "global",
     })
     event.preventDefault()
   })
@@ -443,7 +445,7 @@ const handleEventDelete = async (eventId: string) => {
 // Initialize events on component mount
 onMounted(() => {
   events.value = initializeSampleEvents()
-  
+
   // Add feature detection classes to HTML
   const featureClasses = compatibility.getFeatureClasses()
   document.documentElement.classList.add(...featureClasses)
@@ -451,19 +453,19 @@ onMounted(() => {
 
 // Configure head for PWA and SEO
 useHead({
-  title: 'Event Calendar',
+  title: "Event Calendar",
   meta: [
-    { name: 'description', content: 'Advanced Vue 3 Event Calendar Application with offline support' },
-    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-    { name: 'theme-color', content: '#ffffff' },
-    { name: 'apple-mobile-web-app-capable', content: 'yes' },
-    { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+    { name: "description", content: "Advanced Vue 3 Event Calendar Application with offline support" },
+    { name: "viewport", content: "width=device-width, initial-scale=1" },
+    { name: "theme-color", content: "#ffffff" },
+    { name: "apple-mobile-web-app-capable", content: "yes" },
+    { name: "apple-mobile-web-app-status-bar-style", content: "default" },
   ],
   link: [
-    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-    { rel: 'manifest', href: '/manifest.json' },
-    { rel: 'apple-touch-icon', href: '/favicon.ico' }
-  ]
+    { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+    { rel: "manifest", href: "/manifest.json" },
+    { rel: "apple-touch-icon", href: "/favicon.ico" },
+  ],
 })
 </script>
 
@@ -482,8 +484,10 @@ useHead({
       class="pointer-events-auto"
       :theme="isDark ? 'dark' : 'light'"
       position="top-right"
-      richColors
-      closeButton
+      rich-colors
+      close-button
     />
+    <Analytics />
+    <SpeedInsights />
   </div>
 </template>
