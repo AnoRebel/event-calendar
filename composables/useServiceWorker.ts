@@ -23,7 +23,7 @@ export function useServiceWorker() {
   const registration = ref<ServiceWorkerRegistration | null>(null)
 
   const register = async (): Promise<void> => {
-    TODO: Get the service worker to work properly
+    // TODO: Get the service worker to work properly
     return
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
       state.value.error = "Service Worker not supported"
