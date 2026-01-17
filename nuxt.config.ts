@@ -18,7 +18,7 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ["@nuxt/eslint", "@nuxt/icon", "shadcn-nuxt", "@vueuse/nuxt", "@nuxt/image"],
+  modules: ["@nuxt/eslint", "@nuxt/icon", "shadcn-nuxt", "@vueuse/nuxt", "@nuxt/image", "@nuxt/scripts", "nuxt-umami"],
 
   // CSS optimization
   css: ["~/assets/css/main.css"],
@@ -42,11 +42,42 @@ export default defineNuxtConfig({
     },
   },
 
+  umami: {
+    id: process.env.NUXT_UMAMI_SITE_ID || "",
+    host: "https://umami.anorebel.net",
+    autoTrack: true,
+    proxy: "cloak",
+    // useDirective: true,
+    // ignoreLocalhost: true,
+    // excludeQueryParams: false,
+    // domains: ['cool-site.app', 'my-space.site'],
+    // customEndpoint: '/my-custom-endpoint',
+    // enabled: false,
+    // logErrors: true,
+  },
+
+  scripts: {
+    registry: {
+      rybbitAnalytics: {
+        scriptInput: {
+          src: "https://rybbit.anorebel.net/api/script.js",
+        },
+        siteId: process.env.NUXT_RYBBIT_SITE_ID || "",
+      },
+    },
+  },
+
   // Runtime config for environment variables
   runtimeConfig: {
     // Private keys (only available on server-side)
     secretKey: process.env.SECRET_KEY,
     databaseUrl: process.env.DATABASE_URL,
+    rybbit: {
+      siteId: process.env.NUXT_RYBBIT_SITE_ID || "",
+    },
+    umami: {
+      id: process.env.NUXT_UMAMI_SITE_ID || "",
+    },
 
     // Public keys (exposed to client-side)
     public: {
