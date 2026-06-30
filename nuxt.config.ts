@@ -42,6 +42,20 @@ export default defineNuxtConfig({
     },
   },
 
+  app: {
+    head: {
+      script: process.env.NUXT_RYBBIT_SITE_ID
+        ? [
+            {
+              src: 'https://rybbit.anorebel.net/api/script.js',
+              defer: true,
+              'data-site-id': process.env.NUXT_RYBBIT_SITE_ID,
+            },
+          ]
+        : [],
+    },
+  },
+
   umami: {
     id: process.env.NUXT_UMAMI_SITE_ID || "",
     host: "https://umami.anorebel.net",
@@ -58,12 +72,12 @@ export default defineNuxtConfig({
 
   scripts: {
     registry: {
-      rybbitAnalytics: {
-        scriptInput: {
-          src: "https://rybbit.anorebel.net/api/script.js",
-        },
-        siteId: process.env.NUXT_RYBBIT_SITE_ID || "",
-      },
+      // rybbitAnalytics: {
+      //   scriptInput: {
+      //     src: "https://rybbit.anorebel.net/api/script.js",
+      //   },
+      //   siteId: process.env.NUXT_RYBBIT_SITE_ID || "",
+      // },
     },
   },
 
