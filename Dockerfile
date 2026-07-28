@@ -43,7 +43,9 @@ RUN bun run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Create non-root user for security
+# Create non-root user for security. su-exec lets the entrypoint start as root
+# (to fix the mounted volume's ownership) then drop privileges to run the app.
+RUN apk add --no-cache su-exec
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nuxtjs
 
@@ -69,12 +71,12 @@ ENV LIBSQL_URL="file:/app/.data/events.db"
 # The database lives here — mount a volume so it survives redeploys.
 VOLUME ["/app/.data"]
 
-# Security: don't run as root
-USER nuxtjs
+# NOTE: the container starts as root so the entrypoint can chown the (root-owned)
+# mounted volume, then drops to the nuxtjs user via su-exec before running the app.
 
 # Health check — single line so the Dockerfile parser doesn't choke on the script.
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get({host:'localhost',port:process.env.PORT||3000,path:'/api/health',timeout:2000},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5 \
+  CMD node -e "require('http').get({host:'localhost',port:process.env.PORT||3000,path:'/api/health',timeout:3000},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 EXPOSE 3000
 

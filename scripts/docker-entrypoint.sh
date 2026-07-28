@@ -1,14 +1,17 @@
 #!/bin/sh
 set -e
 
-# Ensure the data directory exists (mounted as a volume in production so the
-# embedded libSQL database persists across deployments).
-mkdir -p "$(dirname "${LIBSQL_URL#file:}")" 2>/dev/null || true
+# The database directory is a mounted volume; on a fresh volume it is root-owned,
+# so the non-root app user cannot write to it. Running as root here, we ensure it
+# exists and hand ownership to the app user, then drop privileges.
+DATA_DIR="$(dirname "${LIBSQL_URL#file:}")"
+mkdir -p "$DATA_DIR"
+chown -R nuxtjs:nodejs "$DATA_DIR" 2>/dev/null || true
 
-# Apply any pending migrations against the embedded libSQL database, then start
-# the Nitro server. The migration runner is idempotent.
+# Apply pending migrations (idempotent), then start the server — both as the
+# non-root app user.
 echo "[entrypoint] running migrations…"
-node scripts/migrate-runtime.mjs
+su-exec nuxtjs:nodejs node scripts/migrate-runtime.mjs
 
 echo "[entrypoint] starting server…"
-exec node server/index.mjs
+exec su-exec nuxtjs:nodejs node server/index.mjs
