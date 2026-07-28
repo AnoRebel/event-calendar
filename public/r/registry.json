@@ -1,0 +1,284 @@
+{
+  "$schema": "https://shadcn-vue.com/schema/registry.json",
+  "name": "event-calendar",
+  "homepage": "https://github.com/AnoRebel/event-calendar",
+  "items": [
+    {
+      "name": "event-calendar",
+      "type": "registry:ui",
+      "title": "Event Calendar",
+      "description": "The calendar UI: month/week/day/agenda views, event modal, drag-and-drop, resize, timezones, recurring events, and status handling. A controlled component — pass events in via a prop, handle add/update/delete emits. No backend required. Recurring UI is gated by a `features` prop.",
+      "dependencies": [
+        "date-fns",
+        "@date-fns/tz",
+        "@internationalized/date",
+        "@vueuse/core",
+        "@tanstack/vue-form",
+        "reka-ui",
+        "uuid",
+        "@vue-dnd-kit/core",
+        "vue-sonner",
+        "lucide-vue-next"
+      ],
+      "registryDependencies": [
+        "button",
+        "card",
+        "calendar",
+        "checkbox",
+        "command",
+        "dialog",
+        "dropdown-menu",
+        "input",
+        "label",
+        "popover",
+        "radio-group",
+        "scroll-area",
+        "select",
+        "textarea",
+        "toggle-group"
+      ],
+      "files": [
+        {
+          "path": "registry/event-calendar/EventCalendar.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/EventCalendar.vue"
+        },
+        {
+          "path": "registry/event-calendar/MonthView.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/MonthView.vue"
+        },
+        {
+          "path": "registry/event-calendar/WeekView.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/WeekView.vue"
+        },
+        {
+          "path": "registry/event-calendar/DayView.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/DayView.vue"
+        },
+        {
+          "path": "registry/event-calendar/AgendaView.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/AgendaView.vue"
+        },
+        {
+          "path": "registry/event-calendar/EventModal.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/EventModal.vue"
+        },
+        {
+          "path": "registry/event-calendar/DragDropVisualFeedback.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/DragDropVisualFeedback.vue"
+        },
+        {
+          "path": "registry/event-calendar/LocationDisplay.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/LocationDisplay.vue"
+        },
+        {
+          "path": "registry/event-calendar/EventResizeHandle.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/EventResizeHandle.vue"
+        },
+        {
+          "path": "registry/event-calendar/DayEventsOverflowPopup.vue",
+          "type": "registry:component",
+          "target": "components/ui/event-calendar/DayEventsOverflowPopup.vue"
+        },
+        {
+          "path": "registry/event-calendar/types.ts",
+          "type": "registry:lib",
+          "target": "components/ui/event-calendar/types.ts"
+        },
+        {
+          "path": "registry/event-calendar/constants.ts",
+          "type": "registry:lib",
+          "target": "components/ui/event-calendar/constants.ts"
+        },
+        {
+          "path": "registry/event-calendar/utils.ts",
+          "type": "registry:lib",
+          "target": "components/ui/event-calendar/utils.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useCalendarUtils.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useCalendarUtils.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useColorManager.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useColorManager.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useCompatibility.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useCompatibility.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useDragAndDrop.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useDragAndDrop.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useEventFiltering.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useEventFiltering.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useEventStatus.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useEventStatus.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useKeyboardNavigation.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useKeyboardNavigation.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useMultiDayLayout.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useMultiDayLayout.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useRecurringEvents.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useRecurringEvents.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useResilientErrorHandling.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useResilientErrorHandling.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useSecurity.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useSecurity.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useTimezone.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useTimezone.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useAdvancedValidation.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useAdvancedValidation.ts"
+        },
+        {
+          "path": "registry/event-calendar/composables/useMonitoring.ts",
+          "type": "registry:hook",
+          "target": "components/ui/event-calendar/composables/useMonitoring.ts"
+        }
+      ]
+    },
+    {
+      "name": "event-calendar-data",
+      "type": "registry:hook",
+      "title": "Event Calendar — Data (client)",
+      "description": "Optional client composable that loads events from and persists them to a REST API (/api/events), converting ISO<->Date. Pairs with the persistence layer. Depends on the core calendar's types.",
+      "dependencies": [
+        "date-fns"
+      ],
+      "registryDependencies": [
+        "https://event-calendar.anorebel.net/r/event-calendar.json"
+      ],
+      "files": [
+        {
+          "path": "registry/event-calendar-data/useCalendarData.ts",
+          "type": "registry:hook",
+          "target": "~/composables/useCalendarData.ts"
+        }
+      ]
+    },
+    {
+      "name": "event-calendar-persistence",
+      "type": "registry:block",
+      "title": "Event Calendar — Persistence (Nitro + libSQL)",
+      "description": "Optional Nitro server layer: /api/events CRUD backed by libSQL via Drizzle, with a dialect-portable schema, validation, and a mapper. Nuxt/Nitro only. Bring your own libSQL URL. Enables durable, per-user events.",
+      "dependencies": [
+        "@libsql/client",
+        "drizzle-orm",
+        "date-fns"
+      ],
+      "devDependencies": [
+        "drizzle-kit"
+      ],
+      "registryDependencies": [
+        "https://event-calendar.anorebel.net/r/event-calendar-data.json"
+      ],
+      "files": [
+        {
+          "path": "registry/event-calendar-persistence/schema.ts",
+          "type": "registry:file",
+          "target": "~/server/db/schema.ts"
+        },
+        {
+          "path": "registry/event-calendar-persistence/db.ts",
+          "type": "registry:file",
+          "target": "~/server/utils/db.ts"
+        },
+        {
+          "path": "registry/event-calendar-persistence/eventMapper.ts",
+          "type": "registry:file",
+          "target": "~/server/utils/eventMapper.ts"
+        },
+        {
+          "path": "registry/event-calendar-persistence/eventValidation.ts",
+          "type": "registry:file",
+          "target": "~/server/utils/eventValidation.ts"
+        },
+        {
+          "path": "registry/event-calendar-persistence/index.get.ts",
+          "type": "registry:file",
+          "target": "~/server/api/events/index.get.ts"
+        },
+        {
+          "path": "registry/event-calendar-persistence/index.post.ts",
+          "type": "registry:file",
+          "target": "~/server/api/events/index.post.ts"
+        },
+        {
+          "path": "registry/event-calendar-persistence/[id].patch.ts",
+          "type": "registry:file",
+          "target": "~/server/api/events/[id].patch.ts"
+        },
+        {
+          "path": "registry/event-calendar-persistence/[id].delete.ts",
+          "type": "registry:file",
+          "target": "~/server/api/events/[id].delete.ts"
+        }
+      ]
+    },
+    {
+      "name": "event-calendar-realtime",
+      "type": "registry:block",
+      "title": "Event Calendar — Realtime collaboration (Nitro crossws)",
+      "description": "Optional real-time sync: a Nitro crossws WebSocket that broadcasts event changes to connected clients (owner-scoped), plus a client composable to apply remote changes with reconnect. Requires the persistence layer and nitro.experimental.websocket.",
+      "dependencies": [],
+      "registryDependencies": [
+        "https://event-calendar.anorebel.net/r/event-calendar-persistence.json"
+      ],
+      "files": [
+        {
+          "path": "registry/event-calendar-realtime/_ws.ts",
+          "type": "registry:file",
+          "target": "~/server/routes/_ws.ts"
+        },
+        {
+          "path": "registry/event-calendar-realtime/broadcast.ts",
+          "type": "registry:file",
+          "target": "~/server/utils/broadcast.ts"
+        },
+        {
+          "path": "registry/event-calendar-realtime/useCalendarRealtime.ts",
+          "type": "registry:hook",
+          "target": "~/composables/useCalendarRealtime.ts"
+        }
+      ]
+    }
+  ]
+}

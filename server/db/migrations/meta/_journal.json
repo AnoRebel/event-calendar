@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1784533557547,
+      "tag": "0000_gorgeous_mother_askani",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784564139346,
+      "tag": "0001_familiar_red_ghost",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785252130261,
+      "tag": "0002_modern_rawhide_kid",
+      "breakpoints": true
+    }
+  ]
+}

@@ -13,5 +13,18 @@
     "exactOptionalPropertyTypes": false,
     "noImplicitOverride": false,
     "skipLibCheck": true
-  }
+  },
+  // Excluded from the app typecheck:
+  // - e2e/: bunwright specs run under `bun test` with Bun's own types.
+  // - registry/event-calendar-{data,persistence,realtime}/: distribution TEMPLATES
+  //   for consumers (shadcn-vue registry). They use consumer-relative import paths
+  //   and auth-decoupled TODO hooks, so they are intentionally not app code. The
+  //   core registry/event-calendar/ UI IS used by the app and stays typechecked.
+  "exclude": [
+    "e2e",
+    "bunwright.config.ts",
+    "app/registry/event-calendar-data",
+    "app/registry/event-calendar-persistence",
+    "app/registry/event-calendar-realtime"
+  ]
 }

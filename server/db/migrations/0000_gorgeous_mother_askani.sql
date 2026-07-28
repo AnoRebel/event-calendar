@@ -1,0 +1,20 @@
+CREATE TABLE `events` (
+	`id` text PRIMARY KEY NOT NULL,
+	`owner_id` text,
+	`title` text NOT NULL,
+	`description` text,
+	`start_date` text NOT NULL,
+	`end_date` text NOT NULL,
+	`start_time` text,
+	`end_time` text,
+	`all_day` integer DEFAULT false NOT NULL,
+	`color` text,
+	`location` text,
+	`status` text,
+	`timezone` text,
+	`is_recurring` integer DEFAULT false NOT NULL,
+	`recurring_pattern` text,
+	`recurring_id` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL
+);

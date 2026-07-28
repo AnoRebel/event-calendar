@@ -19,6 +19,8 @@ logs
 .idea
 .kiro
 .claude
+.opencode
+openspec
 .serena
 
 # Local env files
@@ -26,8 +28,14 @@ logs
 .env.*
 !.env.example
 
+# MCP config — contains API keys/tokens, must never be committed
+.mcp.json
+
 # Playwright
 /test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# e2e screenshot artifacts
+e2e/artifacts/

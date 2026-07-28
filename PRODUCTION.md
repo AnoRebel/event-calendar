@@ -1,381 +1,97 @@
-# Production Deployment Guide
+# Production Deployment (Dokploy)
 
-This guide covers deploying the Event Calendar application to production with all the enhanced features and security
-measures.
+This app is deployed on [Dokploy](https://dokploy.com) using Railpack, at
+[event-calendar.anorebel.net](https://event-calendar.anorebel.net).
 
-## 🚀 Quick Start
+- **Build:** `bun run build`
+- **Start:** `node .output/server/index.mjs`
+- **Auto-deploy:** enabled for the `main` branch — pushing to `main` triggers a new deployment.
 
-```bash
-# Clone and setup
-git clone https://github/AnoRebel/event-calendar
-cd event-calendar
-cp .env.example .env
+## 1. Provision a libSQL database
 
-# Configure environment variables
-nano .env
+The app persists to **libSQL** (Turso-compatible / self-hosted `sqld`) via Drizzle ORM. Provision one of:
 
-# Deploy with Docker
-docker-compose up -d
+- a self-hosted `sqld` service (e.g. as a Dokploy service/container), or
+- a Turso database.
 
-# Or deploy with scripts
-./scripts/deploy.sh
-```
+You'll need the connection URL (and an auth token if the instance requires one).
 
-## 📋 Prerequisites
+## 2. Set environment variables
 
-- Docker & Docker Compose
-- Node.js 18+ & Bun
-- PostgreSQL (optional)
-- Redis (optional)
-- SSL certificates for HTTPS
+Configure these on the Dokploy application. See `.env.example` for the full, authoritative list — the app reads only
+these variables.
 
-## 🔧 Environment Configuration
+**Required**
 
-### Required Environment Variables
+| Variable                | Notes                                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `NODE_ENV`              | `production`                                                                            |
+| `LIBSQL_URL`            | libSQL connection URL (e.g. `http://sqld-host:8080` or a Turso `libsql://…` URL)        |
+| `LIBSQL_AUTH_TOKEN`     | Only if the libSQL instance requires auth (Turso, or a JWT-protected `sqld`)            |
+| `NUXT_SESSION_PASSWORD` | Seals the auth session cookie. **Min 32 chars.** Generate: `openssl rand -base64 32`    |
 
-```bash
-# Application
-NODE_ENV=production
-NUXT_APP_BASE_URL=https://your-domain.com
-SECRET_KEY=your-super-secret-key-change-this
+> **Secrets guard:** in production the server refuses to boot unless `NUXT_SESSION_PASSWORD` is at least 32 characters
+> and not a known placeholder (`server/plugins/secrets-guard.ts`). A missing or weak value aborts startup.
 
-# Database (optional)
-DATABASE_URL=postgresql://user:password@localhost:5432/calendar_db
+**Registration policy** (default is invite/seed-only — first account bootstraps, then invites are required)
 
-# Cache (optional)
-REDIS_URL=redis://localhost:6379
+| Variable                  | Effect                                             |
+| ------------------------- | -------------------------------------------------- |
+| `NUXT_OPEN_REGISTRATION`  | `true` to allow open public registration (runtime) |
+| `OPEN_REGISTRATION`       | Build-time default for the same                    |
 
-# Security
-JWT_SECRET=your-jwt-secret-key
-ENCRYPTION_KEY=your-encryption-key-32-chars
+**Feature flags** (default off)
 
-# Monitoring (optional)
-SENTRY_DSN=https://your-sentry-dsn@sentry.io/project
-```
+| Variable                                  | Notes                                       |
+| ----------------------------------------- | ------------------------------------------- |
+| `FEATURE_RECURRING_EVENTS` / `NUXT_PUBLIC_FEATURES_RECURRING_EVENTS` | Recurring events (build-time / runtime)     |
+| `FEATURE_COLLABORATION` / `NUXT_PUBLIC_FEATURES_COLLABORATION`       | Real-time WebSocket sync (build-time / runtime) |
 
-### Optional Features
+**Analytics** (optional)
 
-```bash
-# Analytics
-NUXT_PUBLIC_ENABLE_ANALYTICS=true
-GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
+| Variable                       | Notes                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `NUXT_UMAMI_SITE_ID`           | **Must be set at BUILD time** — baked into the bundle by `nuxt-umami`           |
+| `NUXT_RYBBIT_SITE_ID`          | Rybbit site id                                                                 |
+| `NUXT_PUBLIC_ENABLE_ANALYTICS` | `false` disables both Umami and Rybbit                                          |
 
-# External Calendar Integration
-GOOGLE_CLIENT_ID=your-google-client-id
-MICROSOFT_CLIENT_ID=your-microsoft-client-id
+> Because `NUXT_UMAMI_SITE_ID` is read during the build, set it in the build environment, not just at runtime — otherwise
+> Umami silently tracks nothing.
 
-# Email Notifications
-SMTP_HOST=smtp.gmail.com
-SMTP_USER=your-email@gmail.com
-```
+## 3. Run migrations
 
-## 🐳 Docker Deployment
-
-### Production with Docker Compose
+Apply the Drizzle migrations against the provisioned libSQL database **once** before (or as part of) the first deploy,
+and again whenever a new migration is added. Point `LIBSQL_URL` / `LIBSQL_AUTH_TOKEN` at the production database and run
+this from a checkout of the repo (the migrations live in `server/db/migrations/`):
 
 ```bash
-# Build and start services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Health check
-curl http://localhost:3000/api/health
+LIBSQL_URL=<prod-url> LIBSQL_AUTH_TOKEN=<token-if-any> bun run db:migrate
 ```
 
-### Custom Docker Build
+Migrations are not applied automatically on server boot — run this step explicitly so schema changes are deliberate and
+observable. After it succeeds, `/api/health` will report `database: healthy`.
+
+## 4. Deploy
+
+Push to `main` (auto-deploy) or trigger a deployment in Dokploy. Railpack builds with `bun run build` and starts with
+`node .output/server/index.mjs`.
+
+## Health checks
+
+`GET /api/health` performs a **real database probe** (`SELECT 1` against libSQL). If the database is unreachable the
+endpoint reports `unhealthy` and returns **HTTP 503**; otherwise `healthy` (200). Point Dokploy's health check at this
+endpoint so a DB outage marks the deployment unhealthy.
 
 ```bash
-# Build image
-docker build -t event-calendar .
-
-# Run container
-docker run -d \
-  --name calendar-app \
-  -p 3000:3000 \
-  -e NODE_ENV=production \
-  -e SECRET_KEY=your-secret \
-  event-calendar
+curl -f https://event-calendar.anorebel.net/api/health
 ```
 
-## 🛠️ Manual Deployment
+## Rollback
 
-### 1. Install Dependencies
+Dokploy retains prior deployments. To roll back:
 
-```bash
-bun install --frozen-lockfile
-```
+- Redeploy a previous build from the Dokploy deployment history, or
+- Revert the offending commit on `main` (`git revert <sha>` and push) — auto-deploy ships the reverted state.
 
-### 2. Build Application
-
-```bash
-bun run build
-```
-
-### 3. Start Production Server
-
-```bash
-node .output/server/index.mjs
-```
-
-## 🔒 Security Configuration
-
-### 1. SSL/TLS Setup
-
-Configure HTTPS in your reverse proxy (nginx/apache):
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-### 2. Environment Security
-
-```bash
-# Set secure file permissions
-chmod 600 .env
-
-# Use Docker secrets for sensitive data
-docker secret create db_password /path/to/password.txt
-```
-
-### 3. Security Headers
-
-The application automatically sets security headers:
-
-- Content Security Policy (CSP)
-- HSTS
-- X-Frame-Options
-- X-Content-Type-Options
-
-## 📊 Monitoring & Analytics
-
-### Built-in Monitoring
-
-The application includes:
-
-- Performance monitoring
-- Error tracking
-- User analytics
-- Health checks
-
-### External Services Integration
-
-Configure monitoring services:
-
-```bash
-# Sentry for error tracking
-SENTRY_DSN=your-sentry-dsn
-
-# Google Analytics
-GOOGLE_ANALYTICS_ID=your-ga-id
-
-# Custom analytics endpoint
-ANALYTICS_ENDPOINT=https://your-analytics.com/api
-```
-
-### Health Monitoring
-
-```bash
-# Health check endpoint
-curl http://localhost:3000/api/health
-
-# Response includes:
-{
-  "status": "healthy",
-  "uptime": 3600,
-  "checks": {
-    "database": "healthy",
-    "redis": "healthy",
-    "memory": "healthy"
-  }
-}
-```
-
-## 🔄 CI/CD Pipeline
-
-### GitHub Actions
-
-The repository includes a complete CI/CD pipeline:
-
-1. **Testing**: Unit tests, E2E tests, linting
-2. **Security**: Dependency audit, vulnerability scanning
-3. **Performance**: Lighthouse CI audits
-4. **Deployment**: Automated Docker builds and deployment
-
-### Manual Deployment
-
-```bash
-# Deploy to production
-./scripts/deploy.sh
-
-# Rollback if needed
-./scripts/deploy.sh rollback
-
-# Check health
-./scripts/deploy.sh health-check
-```
-
-## 📈 Performance Optimization
-
-### Built-in Optimizations
-
-- Event virtualization for large datasets
-- Intelligent caching with LRU eviction
-- Service Worker for offline support
-- Code splitting and lazy loading
-- Image optimization
-
-### Performance Monitoring
-
-```bash
-# Run Lighthouse audit
-bun run performance:audit
-
-# Check Core Web Vitals
-# LCP < 2.5s, FID < 100ms, CLS < 0.1
-```
-
-## 🗄️ Database Setup (Optional)
-
-### PostgreSQL
-
-```sql
--- Create database
-CREATE DATABASE calendar_db;
-CREATE USER calendar_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE calendar_db TO calendar_user;
-
--- Run migrations (if implemented)
-bun run migrate
-```
-
-### Redis Cache
-
-```bash
-# Start Redis
-redis-server
-
-# Configure cache settings
-REDIS_URL=redis://localhost:6379
-CACHE_TTL=3600
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **Service Won't Start**
-
-   ```bash
-   # Check logs
-   docker-compose logs calendar-app
-
-   # Verify environment
-   docker-compose exec calendar-app env
-   ```
-
-2. **Performance Issues**
-
-   ```bash
-   # Check memory usage
-   docker stats
-
-   # Monitor application metrics
-   curl http://localhost:3000/api/health
-   ```
-
-3. **Security Errors**
-
-   ```bash
-   # Verify CSP configuration
-   # Check browser console for CSP violations
-
-   # Validate SSL
-   openssl s_client -connect your-domain.com:443
-   ```
-
-### Debug Mode
-
-```bash
-# Enable debug logging
-NUXT_DEBUG=true bun run start
-
-# Or with Docker
-docker-compose -f docker-compose.yml -f docker-compose.debug.yml up
-```
-
-## 📚 Maintenance
-
-### Regular Tasks
-
-```bash
-# Update dependencies
-bun update
-
-# Security audit
-bun run security:audit
-
-# Clean old Docker images
-docker system prune -a
-
-# Backup database (if used)
-pg_dump $DATABASE_URL > backup.sql
-```
-
-### Monitoring Checklist
-
-- [ ] Check application health endpoint
-- [ ] Monitor error rates and performance
-- [ ] Review security alerts
-- [ ] Update dependencies monthly
-- [ ] Rotate secrets quarterly
-
-## 🎯 Production Features
-
-### ✅ Implemented Features
-
-- **Security**: CSP, input sanitization, rate limiting
-- **Performance**: Virtualization, caching, service worker
-- **Reliability**: Error recovery, circuit breaker, offline support
-- **Monitoring**: Analytics, error tracking, health checks
-- **Accessibility**: WCAG compliance, mobile optimization
-- **PWA**: Offline support, installable, background sync
-
-### 🔄 Scaling Considerations
-
-- **Horizontal scaling**: Load balancer + multiple instances
-- **Database scaling**: Read replicas, connection pooling
-- **Cache scaling**: Redis Cluster for high availability
-- **CDN**: Static asset caching and global distribution
-
-## 📞 Support
-
-For production issues:
-
-1. Check the health endpoint: `/api/health`
-2. Review application logs
-3. Check monitoring dashboards
-4. Consult this documentation
-5. Create an issue with logs and environment details
-
----
-
-## 🔗 Quick Links
-
-- [Development Guide](README.md)
-- [API Documentation](docs/api.md)
-- [Security Policy](SECURITY.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
+If a schema change is involved, remember migrations are forward-only here; plan a compatible follow-up migration rather
+than relying on a code rollback alone.
