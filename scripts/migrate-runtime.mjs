@@ -4,9 +4,40 @@
 //
 // Reads migrations from ./server/db/migrations (copied into the image) and tracks
 // applied ones in a `__migrations` table so re-runs are idempotent.
-import { readdirSync, readFileSync } from "node:fs"
+import { readdirSync, readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
-import { createClient } from "@libsql/client"
+import { pathToFileURL } from "node:url"
+
+// @libsql/client is bundled by Nitro under .output/server/node_modules (which is
+// /app/server/node_modules in the container), NOT the top-level node_modules that
+// a bare `import "@libsql/client"` would resolve. Resolve it explicitly so this
+// script works whether run from a full checkout or the built server bundle.
+async function loadLibsql() {
+  const candidates = [
+    "@libsql/client", // dev / full node_modules
+    join(process.cwd(), "server/node_modules/@libsql/client/index.node.mjs"),
+    join(process.cwd(), "server/node_modules/@libsql/client/lib-esm/node.js"),
+    join(process.cwd(), "node_modules/@libsql/client/index.node.mjs"),
+  ]
+  for (const c of candidates) {
+    try {
+      if (c.startsWith("@")) return await import(c)
+      if (existsSync(c)) return await import(pathToFileURL(c).href)
+    } catch {
+      // try next
+    }
+  }
+  // Last resort: resolve the package dir and import its "main".
+  const dir = join(process.cwd(), "server/node_modules/@libsql/client")
+  if (existsSync(join(dir, "package.json"))) {
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"))
+    const entry = pkg.exports?.["."]?.import?.default || pkg.exports?.["."]?.import || pkg.module || pkg.main
+    if (entry) return await import(pathToFileURL(join(dir, entry)).href)
+  }
+  throw new Error("[migrate] could not locate @libsql/client")
+}
+
+const { createClient } = await loadLibsql()
 
 const url = process.env.LIBSQL_URL || "file:./.data/events.db"
 const authToken = process.env.LIBSQL_AUTH_TOKEN || undefined

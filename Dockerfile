@@ -74,11 +74,9 @@ VOLUME ["/app/.data"]
 # NOTE: the container starts as root so the entrypoint can chown the (root-owned)
 # mounted volume, then drops to the nuxtjs user via su-exec before running the app.
 
-# Health check temporarily DISABLED to diagnose a startup rollback — a failing
-# healthcheck makes Swarm roll back before logs are visible. Re-enable once the
-# container is confirmed serving.
-# HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5 \
-#   CMD node -e "require('http').get({host:'localhost',port:process.env.PORT||3000,path:'/api/health',timeout:3000},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+# Health check — single line so the Dockerfile parser doesn't choke on the script.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5 \
+  CMD node -e "require('http').get({host:'localhost',port:process.env.PORT||3000,path:'/api/health',timeout:3000},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 EXPOSE 3000
 
