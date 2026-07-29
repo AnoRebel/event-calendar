@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { and, eq, isNull } from "drizzle-orm"
+import { and, eq, isNull, ne } from "drizzle-orm"
 import { invites, users } from "../../db/schema"
 import { RegisterSchema } from "#shared/schemas/auth"
 
@@ -15,15 +15,18 @@ export default defineEventHandler(async (event) => {
   const { email: normalizedEmail, password, name, inviteToken } = await readValidated(event, RegisterSchema)
 
   const db = useDb()
-  const { openRegistration } = useRuntimeConfig()
+  const { openRegistration, demo } = useRuntimeConfig()
 
   // Determine whether this registration is allowed and, if via an invite, which
   // one to consume.
   let inviteToConsume: string | null = null
 
   if (!openRegistration) {
-    const userCount = await db.$count(users)
-    const isBootstrap = userCount === 0
+    // The demo account does NOT count toward bootstrap, so the first REAL human
+    // signup can still claim admin even after the demo user has been created.
+    const demoEmail = demo?.email?.trim().toLowerCase() || ""
+    const realUserCount = await db.$count(users, ne(users.email, demoEmail))
+    const isBootstrap = realUserCount === 0
 
     if (!isBootstrap) {
       if (!inviteToken) {

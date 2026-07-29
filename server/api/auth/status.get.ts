@@ -1,3 +1,4 @@
+import { ne } from "drizzle-orm"
 import { users } from "../../db/schema"
 
 // GET /api/auth/status — public. Tells the client how registration should behave
@@ -8,7 +9,9 @@ export default defineEventHandler(async () => {
 
   let needsBootstrap = false
   try {
-    needsBootstrap = (await useDb().$count(users)) === 0
+    // Exclude the demo account so the first REAL human can still bootstrap.
+    const demoEmail = demo?.email?.trim().toLowerCase() || ""
+    needsBootstrap = (await useDb().$count(users, ne(users.email, demoEmail))) === 0
   } catch {
     // If the DB isn't reachable yet, don't claim bootstrap.
     needsBootstrap = false
