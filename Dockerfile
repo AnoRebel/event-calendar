@@ -1,7 +1,9 @@
 # Multi-stage Docker build for production optimization
 
-# Base stage with common dependencies
-FROM node:20-alpine AS base
+# Base stage with common dependencies.
+# NOTE: glibc (node:24-slim / Debian), NOT alpine/musl — @libsql/client bundles a
+# linux-x64-gnu native binding, which does not load on musl.
+FROM node:24-slim AS base
 WORKDIR /app
 
 # Install bun for better performance
@@ -12,7 +14,6 @@ COPY package.json bun.lock* ./
 
 # Dependencies stage
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 # Install ALL deps (including dev) — needed for the build. --production is omitted
 # so devDependencies are included (this Bun rejects --production=false).
 RUN bun install --frozen-lockfile
@@ -40,14 +41,14 @@ ENV NUXT_PUBLIC_ENABLE_ANALYTICS=$NUXT_PUBLIC_ENABLE_ANALYTICS
 RUN bun run build
 
 # Production stage
-FROM node:20-alpine AS runner
+FROM node:24-slim AS runner
 WORKDIR /app
 
-# Create non-root user for security. su-exec lets the entrypoint start as root
-# (to fix the mounted volume's ownership) then drop privileges to run the app.
-RUN apk add --no-cache su-exec
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nuxtjs
+# Create non-root user for security. gosu lets the entrypoint start as root (to fix
+# the mounted volume's ownership) then drop privileges to run the app.
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 --gid nodejs nuxtjs
 
 # Copy built application
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output ./

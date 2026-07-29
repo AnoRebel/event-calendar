@@ -14,7 +14,7 @@ chown -R nuxtjs:nodejs "$DATA_DIR" || echo "[entrypoint] warn: chown failed (con
 # Apply pending migrations (idempotent), then start the server — both as the
 # non-root app user.
 echo "[entrypoint] running migrations…"
-su-exec nuxtjs:nodejs node scripts/migrate-runtime.mjs
+gosu nuxtjs:nodejs node scripts/migrate-runtime.mjs
 
 echo "[entrypoint] starting server…"
-exec su-exec nuxtjs:nodejs node server/index.mjs
+exec gosu nuxtjs:nodejs node server/index.mjs
