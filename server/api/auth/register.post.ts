@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { and, eq, isNull } from "drizzle-orm"
 import { invites, users } from "../../db/schema"
+import { RegisterSchema } from "#shared/schemas/auth"
 
 // POST /api/auth/register — create an account and start a session.
 //
@@ -10,22 +11,10 @@ import { invites, users } from "../../db/schema"
 //     invite token — EXCEPT the very first user (bootstrap) when there are no
 //     users yet, so a fresh deployment can create its initial account.
 export default defineEventHandler(async (event) => {
-  const { email, password, name, inviteToken } = await readBody<{
-    email?: string
-    password?: string
-    name?: string
-    inviteToken?: string
-  }>(event)
-
-  if (!email || !password) {
-    throw createError({ statusCode: 400, statusMessage: "Email and password are required" })
-  }
-  if (password.length < 8) {
-    throw createError({ statusCode: 400, statusMessage: "Password must be at least 8 characters" })
-  }
+  // Schema trims + lowercases the email and enforces the password length.
+  const { email: normalizedEmail, password, name, inviteToken } = await readValidated(event, RegisterSchema)
 
   const db = useDb()
-  const normalizedEmail = email.trim().toLowerCase()
   const { openRegistration } = useRuntimeConfig()
 
   // Determine whether this registration is allowed and, if via an invite, which

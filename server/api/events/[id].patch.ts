@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm"
 import { events } from "../../db/schema"
-import { dtoToRow, rowToDto, type EventDTO } from "../../utils/eventMapper"
-import { validateEventInput } from "../../utils/eventValidation"
-import { editEvent } from "../../../shared/utils/abilities"
+import { dtoToRow, rowToDto } from "../../utils/eventMapper"
+import { UpdateEventSchema } from "#shared/schemas/event"
+import { editEvent } from "#shared/utils/abilities"
 
 // PATCH /api/events/:id — update an event. 401 unauthenticated, 403 non-owner,
 // 404 if it doesn't exist.
@@ -14,11 +14,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Missing event id" })
   }
 
-  const body = await readBody<Partial<EventDTO>>(event)
-  const errors = validateEventInput(body, { partial: true })
-  if (errors.length) {
-    throw createError({ statusCode: 400, statusMessage: "Invalid event", data: { errors } })
-  }
+  const body = await readValidated(event, UpdateEventSchema)
 
   if (body.isRecurring && !useServerFeatures().recurringEvents) {
     throw createError({ statusCode: 403, statusMessage: "Recurring events are not enabled" })

@@ -1,17 +1,12 @@
 import { randomUUID } from "node:crypto"
 import { events } from "../../db/schema"
-import { dtoToRow, rowToDto, type EventDTO } from "../../utils/eventMapper"
-import { validateEventInput } from "../../utils/eventValidation"
+import { dtoToRow, rowToDto } from "../../utils/eventMapper"
+import { CreateEventSchema } from "#shared/schemas/event"
 
 // POST /api/events — create an event. Returns 201 with the persisted event.
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
-  const body = await readBody<Partial<EventDTO>>(event)
-
-  const errors = validateEventInput(body)
-  if (errors.length) {
-    throw createError({ statusCode: 400, statusMessage: "Invalid event", data: { errors } })
-  }
+  const body = await readValidated(event, CreateEventSchema)
 
   // Reject recurring events when the feature is disabled (don't rely on hidden UI).
   if (body.isRecurring && !useServerFeatures().recurringEvents) {

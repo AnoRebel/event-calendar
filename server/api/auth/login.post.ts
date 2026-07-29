@@ -1,15 +1,12 @@
 import { eq } from "drizzle-orm"
 import { users } from "../../db/schema"
+import { LoginSchema } from "#shared/schemas/auth"
 
 // POST /api/auth/login — verify credentials and start a session.
 export default defineEventHandler(async (event) => {
-  const { email, password } = await readBody<{ email?: string; password?: string }>(event)
-  if (!email || !password) {
-    throw createError({ statusCode: 400, statusMessage: "Email and password are required" })
-  }
+  const { email: normalizedEmail, password } = await readValidated(event, LoginSchema)
 
   const db = useDb()
-  const normalizedEmail = email.trim().toLowerCase()
   const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
 
   // Same error whether the account is missing or the password is wrong — don't

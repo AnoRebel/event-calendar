@@ -7,7 +7,18 @@ import { toast } from "vue-sonner"
 const emit = defineEmits<{ (e: "authenticated"): void }>()
 
 const { fetch: refreshSession } = useUserSession()
-const { openRegistration } = useRuntimeConfig().public
+
+// Registration behavior comes from the server so the UI reflects reality:
+// - needsBootstrap: the users table is empty → the first account may be created
+//   with no invite (don't ask for one).
+// - openRegistration: anyone may register.
+// - demoEnabled: offer a one-click demo sign-in.
+const { data: status } = await useFetch("/api/auth/status", { default: () => ({
+  needsBootstrap: false,
+  openRegistration: false,
+  demoEnabled: false,
+  demoEmail: undefined as string | undefined,
+}) })
 
 const mode = ref<"login" | "register">("login")
 const email = ref("")
@@ -17,15 +28,46 @@ const name = ref("")
 const inviteToken = ref((useRoute().query.invite as string) || "")
 const submitting = ref(false)
 
-// Arriving via an invite link opens the register form directly.
-if (inviteToken.value) mode.value = "register"
+// Arriving via an invite link, or when the app needs its first (bootstrap)
+// account, opens the register form directly.
+if (inviteToken.value || status.value.needsBootstrap) mode.value = "register"
 
 const isRegister = computed(() => mode.value === "register")
-// Show the invite field on register when registration isn't open.
-const showInviteField = computed(() => isRegister.value && !openRegistration)
+// Only ask for an invite when registration is closed AND this isn't the very
+// first (bootstrap) account.
+const inviteRequired = computed(
+  () => !status.value.openRegistration && !status.value.needsBootstrap,
+)
+const showInviteField = computed(() => isRegister.value && inviteRequired.value)
 const canSubmit = computed(
   () => email.value.trim().length > 3 && password.value.length >= 8 && !submitting.value,
 )
+
+const heading = computed(() => {
+  if (!isRegister.value) return "Welcome back"
+  return status.value.needsBootstrap ? "Create the first account" : "Create your account"
+})
+const subheading = computed(() => {
+  if (!isRegister.value) return "Sign in to your calendar."
+  return status.value.needsBootstrap
+    ? "This account becomes the admin — no invite needed."
+    : "Start organizing your events."
+})
+
+const demoSubmitting = ref(false)
+const signInDemo = async () => {
+  demoSubmitting.value = true
+  try {
+    await $fetch("/api/auth/demo", { method: "POST" })
+    await refreshSession()
+    toast.success("Welcome to the demo")
+    emit("authenticated")
+  } catch {
+    toast.error("Could not start the demo", { description: "Please try again." })
+  } finally {
+    demoSubmitting.value = false
+  }
+}
 
 const toggleMode = () => {
   mode.value = isRegister.value ? "login" : "register"
@@ -71,11 +113,30 @@ const submit = async () => {
           <Icon name="lucide:calendar-days" size="24" class="text-primary" />
         </div>
         <h1 class="text-2xl font-semibold tracking-tight">
-          {{ isRegister ? "Create your account" : "Welcome back" }}
+          {{ heading }}
         </h1>
         <p class="mt-1 text-sm text-muted-foreground">
-          {{ isRegister ? "Start organizing your events." : "Sign in to your calendar." }}
+          {{ subheading }}
         </p>
+      </div>
+
+      <!-- One-click demo sign-in (when demo mode is enabled). -->
+      <div v-if="status.demoEnabled" class="mb-6">
+        <button
+          type="button"
+          :disabled="demoSubmitting"
+          class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          @click="signInDemo"
+        >
+          <Icon v-if="demoSubmitting" name="lucide:loader-circle" size="16" class="animate-spin" />
+          <Icon v-else name="lucide:play" size="15" />
+          Explore the demo — no signup
+        </button>
+        <div class="mt-4 flex items-center gap-3 text-xs text-muted-foreground">
+          <span class="h-px flex-1 bg-border" />
+          or
+          <span class="h-px flex-1 bg-border" />
+        </div>
       </div>
 
       <form class="space-y-4" @submit.prevent="submit">

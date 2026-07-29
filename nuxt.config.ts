@@ -36,6 +36,11 @@ export default defineNuxtConfig({
       websocket: true,
       tasks: true
     },
+    // Reset the demo account's data once a day (00:00) so the public demo stays
+    // tidy. The task itself no-ops when demo mode is disabled.
+    scheduledTasks: {
+      "0 0 * * *": ["demo:reset"],
+    },
     prerender: {
       crawlLinks: true,
       routes: ["/"],
@@ -123,6 +128,17 @@ export default defineNuxtConfig({
     // (bootstrap) when the users table is empty. Set to true to allow open
     // public registration. Read at runtime.
     openRegistration: flag(process.env.OPEN_REGISTRATION),
+
+    // Demo mode: a shared, prefilled account for one-click sign-in, seeded with
+    // dummy events that a scheduled task periodically resets. Off by default.
+    demo: {
+      enabled: flag(process.env.DEMO_MODE),
+      email: process.env.DEMO_EMAIL || "demo@event-calendar.app",
+      password: process.env.DEMO_PASSWORD || "demo-calendar-1234",
+      // How often the demo account's data is reset (minutes) — informational; the
+      // actual schedule is the daily cron in nitro.scheduledTasks. Default 24h.
+      resetMinutes: Number.parseInt(process.env.DEMO_RESET_MINUTES || "1440", 10) || 1440,
+    },
 
     // NOTE: analytics site IDs are resolved at build time (see top of file) —
     // nuxt-umami bakes its id in during setup and Rybbit is injected via app.head —

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm"
 import { events } from "../../db/schema"
-import { deleteEvent as canDeleteEvent } from "../../../shared/utils/abilities"
+import { deleteEvent as canDeleteEvent } from "#shared/utils/abilities"
 
 // DELETE /api/events/:id — remove an event. 401 unauthenticated, 403 non-owner,
 // 204 on success, 404 if missing.
