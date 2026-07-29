@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue"
+import { ref, computed, onMounted } from "vue"
 import { toast } from "vue-sonner"
 
 // Sign-in / sign-up panel shown when the user is logged out. On success it
@@ -13,12 +13,16 @@ const { fetch: refreshSession } = useUserSession()
 //   with no invite (don't ask for one).
 // - openRegistration: anyone may register.
 // - demoEnabled: offer a one-click demo sign-in.
-const { data: status } = await useFetch("/api/auth/status", { default: () => ({
-  needsBootstrap: false,
-  openRegistration: false,
-  demoEnabled: false,
-  demoEmail: undefined as string | undefined,
-}) })
+//
+// Fetched client-side on mount (NOT useFetch) because the "/" route is
+// prerendered — a build-time fetch would freeze a stale status into the payload.
+interface AuthStatus {
+  needsBootstrap: boolean
+  openRegistration: boolean
+  demoEnabled: boolean
+  demoEmail?: string
+}
+const status = ref<AuthStatus>({ needsBootstrap: false, openRegistration: false, demoEnabled: false })
 
 const mode = ref<"login" | "register">("login")
 const email = ref("")
@@ -28,9 +32,19 @@ const name = ref("")
 const inviteToken = ref((useRoute().query.invite as string) || "")
 const submitting = ref(false)
 
-// Arriving via an invite link, or when the app needs its first (bootstrap)
-// account, opens the register form directly.
-if (inviteToken.value || status.value.needsBootstrap) mode.value = "register"
+onMounted(async () => {
+  try {
+    status.value = await $fetch<AuthStatus>("/api/auth/status")
+    // Arriving via an invite link, or when the app needs its first (bootstrap)
+    // account, opens the register form directly.
+    if (inviteToken.value || status.value.needsBootstrap) mode.value = "register"
+  } catch {
+    // Leave defaults (login mode, no demo) if status can't be reached.
+  }
+})
+
+// An invite link opens the register form immediately (before status resolves).
+if (inviteToken.value) mode.value = "register"
 
 const isRegister = computed(() => mode.value === "register")
 // Only ask for an invite when registration is closed AND this isn't the very
