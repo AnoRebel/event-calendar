@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { nuxtConfigSnippet, vueWrapperSnippet, usageSnippet } from "@/lib/docs-snippets"
+
 useHead({ title: "Install & usage" })
 
 const REGISTRY = "https://event-calendar.anorebel.net/r"
@@ -40,7 +42,7 @@ const tiers = [
     item: "event-calendar-realtime",
     deps: "Pulls in: Persistence (and everything below it)",
   },
-]
+] as const
 </script>
 
 <template>
@@ -65,10 +67,8 @@ const tiers = [
         A configurable, drag-and-drop event calendar for Vue&nbsp;3 &amp; Nuxt. Installed the shadcn way — components
         copied into your project, yours to edit.
       </p>
-      <div class="mt-6 overflow-x-auto">
-        <code class="inline-block whitespace-nowrap rounded-lg border border-border bg-muted px-4 py-2.5 font-mono text-sm">
-          <span class="text-primary">$</span> npx shadcn-vue@latest add {{ REGISTRY }}/event-calendar.json
-        </code>
+      <div class="mt-6">
+        <InstallTabs :url="`${REGISTRY}/event-calendar.json`" />
       </div>
     </header>
 
@@ -117,11 +117,7 @@ const tiers = [
             </span>
           </div>
           <p class="mb-3 max-w-xl text-sm text-muted-foreground">{{ t.desc }}</p>
-          <div class="overflow-x-auto rounded-lg border border-border bg-muted/60 p-3">
-            <code class="whitespace-nowrap font-mono text-[13px]">
-              npx shadcn-vue@latest add {{ REGISTRY }}/<span class="text-primary">{{ t.item }}</span>.json
-            </code>
-          </div>
+          <InstallTabs :url="`${REGISTRY}/${t.item}.json`" />
           <p class="mt-3 text-xs text-muted-foreground/80">{{ t.deps }}</p>
         </article>
       </div>
@@ -136,22 +132,9 @@ const tiers = [
         <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">DnDProvider</code>.
       </p>
       <p class="mb-2 text-sm font-medium">Nuxt — add the module (auto-registers the provider):</p>
-      <pre class="mb-5 overflow-x-auto rounded-lg border border-border bg-muted/60 p-4 font-mono text-[13px] leading-relaxed"><code>// nuxt.config.ts
-export default defineNuxtConfig({
-  modules: ["@vue-dnd-kit/nuxt"],
-})</code></pre>
+      <CodeBlock class="mb-5" lang="ts" :code="nuxtConfigSnippet" />
       <p class="mb-2 text-sm font-medium">Plain Vue — wrap your app manually:</p>
-      <pre class="overflow-x-auto rounded-lg border border-border bg-muted/60 p-4 font-mono text-[13px] leading-relaxed"><code>&lt;script setup&gt;
-import { DnDProvider, DragPreview } from "@vue-dnd-kit/core"
-import EventCalendar from "@/components/event-calendar/EventCalendar.vue"
-&lt;/script&gt;
-
-&lt;template&gt;
-  &lt;DnDProvider&gt;
-    &lt;EventCalendar :events="events" /&gt;
-    &lt;DragPreview /&gt;
-  &lt;/DnDProvider&gt;
-&lt;/template&gt;</code></pre>
+      <CodeBlock lang="vue" :code="vueWrapperSnippet" />
     </section>
 
     <!-- Usage -->
@@ -163,16 +146,7 @@ import EventCalendar from "@/components/event-calendar/EventCalendar.vue"
         <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">events</code> prop and respond to the three emits.
         It never talks to a backend on its own.
       </p>
-      <pre class="overflow-x-auto rounded-lg border border-border bg-muted/60 p-4 font-mono text-[13px] leading-relaxed"><code>&lt;EventCalendar
-  :events="events"
-  initial-view="month"
-  @event-add="onAdd"
-  @event-update="onUpdate"
-  @event-delete="onDelete"
-&gt;
-  &lt;!-- optional: your own header control --&gt;
-  &lt;template #header-actions&gt;&lt;DarkModeToggle /&gt;&lt;/template&gt;
-&lt;/EventCalendar&gt;</code></pre>
+      <CodeBlock lang="vue" :code="usageSnippet" />
     </section>
 
     <!-- Reference -->
