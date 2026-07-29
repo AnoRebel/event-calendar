@@ -91,6 +91,17 @@ const tiers = [
           The 15 UI primitives the calendar uses are declared as registry dependencies, so
           <span class="text-foreground">the installer pulls them in automatically</span>.
         </li>
+        <li>
+          The calendar installs to
+          <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">components/ui/event-calendar/</code>
+          (a peer of the primitives), keeping its
+          <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">composables/</code> intact. Import it via
+          <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">@/components/ui/event-calendar/EventCalendar.vue</code>
+          — make sure your <span class="text-foreground"><code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">@/</code> alias</span>
+          resolves to that folder (Vite writes it under
+          <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">src/</code>; Nuxt auto-imports the project-root
+          <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">components/</code>).
+        </li>
       </ul>
     </section>
 

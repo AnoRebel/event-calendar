@@ -39,138 +39,138 @@
       ],
       "files": [
         {
-          "path": "registry/event-calendar/EventCalendar.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/EventCalendar.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/EventCalendar.vue"
         },
         {
-          "path": "registry/event-calendar/MonthView.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/MonthView.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/MonthView.vue"
         },
         {
-          "path": "registry/event-calendar/WeekView.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/WeekView.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/WeekView.vue"
         },
         {
-          "path": "registry/event-calendar/DayView.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/DayView.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/DayView.vue"
         },
         {
-          "path": "registry/event-calendar/AgendaView.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/AgendaView.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/AgendaView.vue"
         },
         {
-          "path": "registry/event-calendar/EventModal.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/EventModal.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/EventModal.vue"
         },
         {
-          "path": "registry/event-calendar/DragDropVisualFeedback.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/DragDropVisualFeedback.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/DragDropVisualFeedback.vue"
         },
         {
-          "path": "registry/event-calendar/LocationDisplay.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/LocationDisplay.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/LocationDisplay.vue"
         },
         {
-          "path": "registry/event-calendar/EventResizeHandle.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/EventResizeHandle.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/EventResizeHandle.vue"
         },
         {
-          "path": "registry/event-calendar/DayEventsOverflowPopup.vue",
-          "type": "registry:component",
+          "path": "app/registry/event-calendar/DayEventsOverflowPopup.vue",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/DayEventsOverflowPopup.vue"
         },
         {
-          "path": "registry/event-calendar/types.ts",
-          "type": "registry:lib",
+          "path": "app/registry/event-calendar/types.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/types.ts"
         },
         {
-          "path": "registry/event-calendar/constants.ts",
-          "type": "registry:lib",
+          "path": "app/registry/event-calendar/constants.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/constants.ts"
         },
         {
-          "path": "registry/event-calendar/utils.ts",
-          "type": "registry:lib",
+          "path": "app/registry/event-calendar/utils.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/utils.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useCalendarUtils.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useCalendarUtils.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useCalendarUtils.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useColorManager.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useColorManager.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useColorManager.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useCompatibility.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useCompatibility.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useCompatibility.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useDragAndDrop.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useDragAndDrop.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useDragAndDrop.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useEventFiltering.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useEventFiltering.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useEventFiltering.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useEventStatus.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useEventStatus.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useEventStatus.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useKeyboardNavigation.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useKeyboardNavigation.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useKeyboardNavigation.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useMultiDayLayout.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useMultiDayLayout.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useMultiDayLayout.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useRecurringEvents.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useRecurringEvents.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useRecurringEvents.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useResilientErrorHandling.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useResilientErrorHandling.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useResilientErrorHandling.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useSecurity.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useSecurity.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useSecurity.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useTimezone.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useTimezone.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useTimezone.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useAdvancedValidation.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useAdvancedValidation.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useAdvancedValidation.ts"
         },
         {
-          "path": "registry/event-calendar/composables/useMonitoring.ts",
-          "type": "registry:hook",
+          "path": "app/registry/event-calendar/composables/useMonitoring.ts",
+          "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useMonitoring.ts"
         }
       ]
@@ -188,7 +188,7 @@
       ],
       "files": [
         {
-          "path": "registry/event-calendar-data/useCalendarData.ts",
+          "path": "app/registry/event-calendar-data/useCalendarData.ts",
           "type": "registry:hook",
           "target": "~/composables/useCalendarData.ts"
         }
@@ -212,42 +212,42 @@
       ],
       "files": [
         {
-          "path": "registry/event-calendar-persistence/schema.ts",
+          "path": "app/registry/event-calendar-persistence/schema.ts",
           "type": "registry:file",
           "target": "~/server/db/schema.ts"
         },
         {
-          "path": "registry/event-calendar-persistence/db.ts",
+          "path": "app/registry/event-calendar-persistence/db.ts",
           "type": "registry:file",
           "target": "~/server/utils/db.ts"
         },
         {
-          "path": "registry/event-calendar-persistence/eventMapper.ts",
+          "path": "app/registry/event-calendar-persistence/eventMapper.ts",
           "type": "registry:file",
           "target": "~/server/utils/eventMapper.ts"
         },
         {
-          "path": "registry/event-calendar-persistence/eventValidation.ts",
+          "path": "app/registry/event-calendar-persistence/eventValidation.ts",
           "type": "registry:file",
           "target": "~/server/utils/eventValidation.ts"
         },
         {
-          "path": "registry/event-calendar-persistence/index.get.ts",
+          "path": "app/registry/event-calendar-persistence/index.get.ts",
           "type": "registry:file",
           "target": "~/server/api/events/index.get.ts"
         },
         {
-          "path": "registry/event-calendar-persistence/index.post.ts",
+          "path": "app/registry/event-calendar-persistence/index.post.ts",
           "type": "registry:file",
           "target": "~/server/api/events/index.post.ts"
         },
         {
-          "path": "registry/event-calendar-persistence/[id].patch.ts",
+          "path": "app/registry/event-calendar-persistence/[id].patch.ts",
           "type": "registry:file",
           "target": "~/server/api/events/[id].patch.ts"
         },
         {
-          "path": "registry/event-calendar-persistence/[id].delete.ts",
+          "path": "app/registry/event-calendar-persistence/[id].delete.ts",
           "type": "registry:file",
           "target": "~/server/api/events/[id].delete.ts"
         }
@@ -264,17 +264,17 @@
       ],
       "files": [
         {
-          "path": "registry/event-calendar-realtime/_ws.ts",
+          "path": "app/registry/event-calendar-realtime/_ws.ts",
           "type": "registry:file",
           "target": "~/server/routes/_ws.ts"
         },
         {
-          "path": "registry/event-calendar-realtime/broadcast.ts",
+          "path": "app/registry/event-calendar-realtime/broadcast.ts",
           "type": "registry:file",
           "target": "~/server/utils/broadcast.ts"
         },
         {
-          "path": "registry/event-calendar-realtime/useCalendarRealtime.ts",
+          "path": "app/registry/event-calendar-realtime/useCalendarRealtime.ts",
           "type": "registry:hook",
           "target": "~/composables/useCalendarRealtime.ts"
         }

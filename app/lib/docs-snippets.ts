@@ -12,7 +12,7 @@ export default defineNuxtConfig({
 
 export const vueWrapperSnippet = `<script setup>
 import { DnDProvider, DragPreview } from "@vue-dnd-kit/core"
-import EventCalendar from "@/components/event-calendar/EventCalendar.vue"
+import EventCalendar from "@/components/ui/event-calendar/EventCalendar.vue"
 </script>
 
 <template>
