@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 import { addDays } from "date-fns"
 import { invites } from "../../db/schema"
 import { CreateInviteSchema } from "#shared/schemas/auth"
+import { defineEventHandler, setResponseStatus } from "nuxt/server"
 
 // POST /api/invites — create an invite token (authenticated).
 export default defineEventHandler(async (event) => {

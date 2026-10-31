@@ -140,15 +140,16 @@ export async function startServerIfNeeded(): Promise<void> {
   // Default the spawned server to the local dev libSQL file if no URL is set, so
   // the e2e run has real persistence without extra configuration.
   const libsqlUrl = process.env.LIBSQL_URL || process.env.DATABASE_URL || `file:${process.cwd()}/.data/events.db`
-  // The app is auth-gated — the session cookie needs a signing password.
-  const sessionPassword = process.env.NUXT_SESSION_PASSWORD || "e2e-test-session-password-at-least-32chars"
+  // The app is auth-gated — the session cookie is sealed with a key derived from
+  // the app secret.
+  const appSecret = process.env.NUXT_APP_SECRET || "e2e-test-app-secret-at-least-32-characters"
   serverProc = spawn(["node", ".output/server/index.mjs"], {
     env: {
       ...process.env,
       PORT: port,
       NITRO_PORT: port,
       LIBSQL_URL: libsqlUrl,
-      NUXT_SESSION_PASSWORD: sessionPassword,
+      NUXT_APP_SECRET: appSecret,
       NODE_ENV: "development",
     },
     stdout: "ignore",

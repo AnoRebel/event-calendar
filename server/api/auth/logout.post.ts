@@ -1,3 +1,5 @@
+import { defineEventHandler } from "nuxt/server"
+
 // POST /api/auth/logout — clear the session.
 export default defineEventHandler(async (event) => {
   await clearUserSession(event)

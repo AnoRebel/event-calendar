@@ -70,17 +70,6 @@ export default defineNuxtConfig({
   // Build optimization
   vite: {
     plugins: [tailwindcss()],
-    build: {
-      rollupOptions: {
-        output: {
-          manualChunks(id: string) {
-            if (id.includes("node_modules/date-fns")) return "date-fns"
-            if (id.includes("node_modules/vue-sonner")) return "vue-sonner"
-            if (id.includes("node_modules/uuid")) return "uuid"
-          },
-        },
-      },
-    },
     optimizeDeps: {
       include: ["date-fns", "vue-sonner", "uuid"],
     },
@@ -184,14 +173,35 @@ export default defineNuxtConfig({
     },
   },
 
+  // TypeScript: Nuxt 4 project references (see tsconfig.json). The optional
+  // registry layers (data/persistence/realtime) are distribution templates for
+  // consumers — they use consumer-relative imports, so they are not app code.
+  typescript: {
+    tsConfig: {
+      exclude: [
+        "../app/registry/event-calendar-data",
+        "../app/registry/event-calendar-persistence",
+        "../app/registry/event-calendar-realtime",
+      ],
+    },
+  },
+
+  // Components: shadcn-nuxt registers components/ui itself, so the default
+  // scan skips that folder (otherwise every index.ts collides with its .vue).
+  components: [{ path: "~/components", ignore: ["ui/**"] }],
+
   // Component configuration
   shadcn: {
     prefix: "",
-    componentDir: "./components/ui",
+    componentDir: "./app/components/ui",
   },
 
-  // Experimental features for performance
+  // Experimental features
   experimental: {
+    // compatibilityVersion 5 turns Nitro's h3 auto-imports off. Our server code
+    // imports h3/nitropack explicitly, but third-party modules (nuxt-authorization)
+    // still import h3 utils from `#imports`, so keep the presets enabled.
+    nitroAutoImports: true,
     payloadExtraction: false,
     renderJsonPayloads: true,
   },

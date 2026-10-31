@@ -1,3 +1,5 @@
+import { defineEventHandler, setResponseStatus } from "nuxt/server"
+
 export default defineEventHandler(async (event) => {
   const startTime = Date.now()
 

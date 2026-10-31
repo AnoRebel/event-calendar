@@ -9,7 +9,7 @@ import * as schema from "../server/db/schema"
 const url = process.env.LIBSQL_URL || "file:./.data/events.db"
 const authToken = process.env.LIBSQL_AUTH_TOKEN || undefined
 const client = createClient(authToken ? { url, authToken } : { url })
-const db = drizzle(client, { schema })
+const db = drizzle({ client })
 
 const now = new Date()
 const iso = (d: Date) => d.toISOString()

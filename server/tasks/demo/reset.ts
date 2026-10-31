@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm"
-import { users } from "../db/schema"
-import { ensureDemoUser, reseedDemoEvents } from "../utils/demo"
+import { users } from "../../db/schema"
+import { ensureDemoUser, reseedDemoEvents } from "../../utils/demo"
+import { defineTask } from "nitropack/runtime"
+import { useRuntimeConfig } from "nuxt/server"
 
 // Scheduled task: reset the demo account's events back to the sample set so the
 // public demo always looks tidy regardless of what visitors did. Scheduled in

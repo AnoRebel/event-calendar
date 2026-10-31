@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm"
 import { users } from "../../db/schema"
 import { LoginSchema } from "#shared/schemas/auth"
+import { createError, defineEventHandler } from "nuxt/server"
 
 // POST /api/auth/login — verify credentials and start a session.
 export default defineEventHandler(async (event) => {
@@ -11,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   // Same error whether the account is missing or the password is wrong — don't
   // reveal which accounts exist.
-  const invalid = () => createError({ statusCode: 401, statusMessage: "Invalid email or password" })
+  const invalid = () => createError({ status: 401, message: "Invalid email or password" })
   if (!user) {
     // Still run a verify to reduce timing signal.
     await verifyPassword("$scrypt$placeholder", password).catch(() => false)

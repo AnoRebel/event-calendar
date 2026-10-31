@@ -74,8 +74,9 @@ export function useColorManager(
   const getNextAvailableColor = (): EventColor => {
     const available = availableColors.value
     
-    if (available.length > 0) {
-      return available[0]
+    const next = available[0]
+    if (next) {
+      return next
     }
     
     // If no colors are available, cycle through the palette

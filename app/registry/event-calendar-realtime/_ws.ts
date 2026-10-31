@@ -1,5 +1,6 @@
 import type { Peer } from "crossws"
 import { registerBroadcaster, type EventChange } from "../utils/broadcast"
+import { defineWebSocketHandler } from "h3"
 
 // Single broadcast channel: every connected peer subscribes to "events" and
 // receives all changes. This is the single-user template — there is no

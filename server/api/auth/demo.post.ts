@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm"
 import { events } from "../../db/schema"
 import { ensureDemoUser, reseedDemoEvents } from "../../utils/demo"
+import { createError, defineEventHandler, useRuntimeConfig } from "nuxt/server"
 
 // POST /api/auth/demo — one-click sign-in to the shared demo account. Creates the
 // account on first use and seeds sample events if it has none, then starts a
@@ -8,7 +9,7 @@ import { ensureDemoUser, reseedDemoEvents } from "../../utils/demo"
 export default defineEventHandler(async (event) => {
   const { demo } = useRuntimeConfig()
   if (!demo?.enabled) {
-    throw createError({ statusCode: 404, statusMessage: "Demo mode is not enabled" })
+    throw createError({ status: 404, message: "Demo mode is not enabled" })
   }
 
   const user = await ensureDemoUser()

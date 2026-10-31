@@ -83,15 +83,15 @@ export function useRecurringEvents(events: ComputedRef<CalendarEvent[]>) {
         if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
           // Find next day of week
           const currentDay = getDay(currentDate)
-          const nextDay = pattern.daysOfWeek.find(day => day > currentDay) ?? 
-                         pattern.daysOfWeek[0]
+          const firstDay = pattern.daysOfWeek[0]!
+          const nextDay = pattern.daysOfWeek.find(day => day > currentDay) ?? firstDay
           
           if (nextDay > currentDay) {
             return setDay(currentDate, nextDay)
           } else {
             // Move to next week and set to first day
             const nextWeek = addWeeks(currentDate, pattern.interval)
-            return setDay(nextWeek, pattern.daysOfWeek[0])
+            return setDay(nextWeek, firstDay)
           }
         } else {
           return addWeeks(currentDate, pattern.interval)

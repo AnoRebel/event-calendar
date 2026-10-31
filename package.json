@@ -73,7 +73,7 @@
     "vue-sonner": "^2.0.9"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.149",
+    "@iconify-json/lucide": "^1.2.150",
     "@types/node": "^26.6.6",
     "@types/uuid": "^11.0.0",
     "@vitest/ui": "^5.0.5",

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { events } from "../../db/schema"
 import { dtoToRow, rowToDto, type EventDTO } from "../../utils/eventMapper"
 import { validateEventInput } from "../../utils/eventValidation"
+import { defineEventHandler, readBody, createError, setResponseStatus } from "h3"
 
 // POST /api/events — create an event. Returns 201 with the persisted event.
 export default defineEventHandler(async (event) => {

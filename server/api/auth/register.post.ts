@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { and, eq, isNull, ne } from "drizzle-orm"
 import { invites, users } from "../../db/schema"
 import { RegisterSchema } from "#shared/schemas/auth"
+import { createError, defineEventHandler, useRuntimeConfig } from "nuxt/server"
 
 // POST /api/auth/register — create an account and start a session.
 //
@@ -30,7 +31,7 @@ export default defineEventHandler(async (event) => {
 
     if (!isBootstrap) {
       if (!inviteToken) {
-        throw createError({ statusCode: 403, statusMessage: "Registration is invite-only" })
+        throw createError({ status: 403, message: "Registration is invite-only" })
       }
       const now = new Date().toISOString()
       const [invite] = await db
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
         .where(and(eq(invites.token, inviteToken), isNull(invites.usedBy)))
         .limit(1)
 
-      const invalid = () => createError({ statusCode: 403, statusMessage: "Invalid or expired invite" })
+      const invalid = () => createError({ status: 403, message: "Invalid or expired invite" })
       if (!invite) throw invalid()
       if (invite.expiresAt && invite.expiresAt < now) throw invalid()
       if (invite.email && invite.email.toLowerCase() !== normalizedEmail) throw invalid()
@@ -51,7 +52,7 @@ export default defineEventHandler(async (event) => {
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, normalizedEmail)).limit(1)
   if (existing.length > 0) {
     // Avoid revealing that the account exists beyond what registration requires.
-    throw createError({ statusCode: 409, statusMessage: "Unable to register with those details" })
+    throw createError({ status: 409, message: "Unable to register with those details" })
   }
 
   const id = randomUUID()

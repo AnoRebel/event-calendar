@@ -53,14 +53,29 @@ const applied = new Set(
   (await client.execute("SELECT name FROM __migrations")).rows.map(r => String(r.name)),
 )
 
-const files = readdirSync(dir)
-  .filter(f => f.endsWith(".sql"))
-  .sort()
+// drizzle-kit 1.x writes one folder per migration (`<timestamp>_<tag>/migration.sql`);
+// older checkouts have flat `<NNNN>_<tag>.sql` files. Support both, in order.
+const entries = readdirSync(dir, { withFileTypes: true })
+const migrations = entries
+  .flatMap(e => {
+    if (e.isDirectory() && existsSync(join(dir, e.name, "migration.sql"))) {
+      return [{ name: e.name, path: join(dir, e.name, "migration.sql") }]
+    }
+    if (e.isFile() && e.name.endsWith(".sql")) return [{ name: e.name, path: join(dir, e.name) }]
+    return []
+  })
+  .sort((a, b) => a.name.localeCompare(b.name))
+
+// The tag is the part after the numeric prefix (`gorgeous_mother_askani`). Databases
+// migrated before the folder layout recorded `0000_<tag>.sql`, so a migration counts
+// as applied when either its current name or its tag was recorded.
+const tagOf = name => name.replace(/\.sql$/, "").replace(/^\d+_/, "")
+const appliedTags = new Set([...applied].map(tagOf))
 
 let count = 0
-for (const file of files) {
-  if (applied.has(file)) continue
-  const sql = readFileSync(join(dir, file), "utf8")
+for (const migration of migrations) {
+  if (applied.has(migration.name) || appliedTags.has(tagOf(migration.name))) continue
+  const sql = readFileSync(migration.path, "utf8")
   // drizzle separates statements with the `--> statement-breakpoint` marker.
   const statements = sql
     .split("--> statement-breakpoint")
@@ -71,10 +86,10 @@ for (const file of files) {
   }
   await client.execute({
     sql: "INSERT INTO __migrations (name, applied_at) VALUES (?, ?)",
-    args: [file, new Date().toISOString()],
+    args: [migration.name, new Date().toISOString()],
   })
   count++
-  console.log(`[migrate] applied ${file}`)
+  console.log(`[migrate] applied ${migration.name}`)
 }
 
 console.log(count ? `[migrate] ${count} migration(s) applied.` : "[migrate] up to date.")

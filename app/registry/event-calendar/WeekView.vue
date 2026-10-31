@@ -123,10 +123,8 @@ const dragState = ref({
 })
 
 const timeSlotsForView = computed<TimeSlot[]>(() => {
-  if (props.weekDaysData.length > 0) {
-    return generateTimeSlots(props.weekDaysData[0].date)
-  }
-  return []
+  const first = props.weekDaysData[0]
+  return first ? generateTimeSlots(first.date) : []
 })
 
 // Process raw timed events to include style for positioning

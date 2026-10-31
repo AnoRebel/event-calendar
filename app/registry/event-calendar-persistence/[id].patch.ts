@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm"
 import { events } from "../../db/schema"
 import { dtoToRow, rowToDto, type EventDTO } from "../../utils/eventMapper"
 import { validateEventInput } from "../../utils/eventValidation"
+import { defineEventHandler, readBody, getRouterParam, createError } from "h3"
 
 // PATCH /api/events/:id — update an event. 404 if it doesn't exist.
 export default defineEventHandler(async (event) => {

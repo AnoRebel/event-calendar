@@ -1,6 +1,7 @@
 import { and, gte, lte } from "drizzle-orm"
 import { events } from "../../db/schema"
 import { rowToDto } from "../../utils/eventMapper"
+import { defineEventHandler, getQuery } from "h3"
 
 // GET /api/events?start=&end=&page=&limit=
 // Returns a paginated envelope: { data, total, page, limit, hasMore }.

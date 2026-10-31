@@ -58,7 +58,7 @@ export function useMultiDayLayout(days: ComputedRef<MonthViewDay[]>) {
       while (true) {
         const isLaneAvailable = eventDays.every(day => {
           const dayKey = format(day.date, 'yyyy-MM-dd')
-          return !dayLaneOccupancy[dayKey].has(lane)
+          return !dayLaneOccupancy[dayKey]?.has(lane)
         })
         
         if (isLaneAvailable) break
@@ -68,11 +68,12 @@ export function useMultiDayLayout(days: ComputedRef<MonthViewDay[]>) {
       // Mark this lane as occupied for all days
       eventDays.forEach(day => {
         const dayKey = format(day.date, 'yyyy-MM-dd')
+        dayLaneOccupancy[dayKey] ??= new Set<number>()
         dayLaneOccupancy[dayKey].add(lane)
       })
       
-      const layoutStart = format(eventDays[0].date, 'yyyy-MM-dd')
-      const layoutEnd = format(eventDays[eventDays.length - 1].date, 'yyyy-MM-dd')
+      const layoutStart = format(eventDays[0]!.date, 'yyyy-MM-dd')
+      const layoutEnd = format(eventDays[eventDays.length - 1]!.date, 'yyyy-MM-dd')
       
       return {
         ...event,

@@ -560,7 +560,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
               <template #default="{ field }">
                 <div class="min-w-28 *:not-first:mt-1.5">
                   <Label :for="field.name">Start Time</Label>
-                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
+                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
                     <SelectTrigger>
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
@@ -635,7 +635,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
               <template #default="{ field }">
                 <div class="min-w-28 *:not-first:mt-1.5">
                   <Label :for="field.name">End Time</Label>
-                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
+                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
                     <SelectTrigger>
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
@@ -721,7 +721,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                   :default-value="colorOptions[0]?.value"
                   :model-value="field.state.value"
                   @blur="field.handleBlur"
-                  @update:model-value="field.handleChange"
+                  @update:model-value="(v: unknown) => field.handleChange(v as never)"
                 >
                   <RadioGroupItem
                     v-for="colorOption in colorOptions"
@@ -743,7 +743,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
             <template #default="{ field }">
               <div class="*:not-first:mt-1.5">
                 <Label :for="field.name">Status</Label>
-                <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
+                <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -774,7 +774,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                       variant="outline"
                       class="cursor-pointer justify-between w-full"
                     >
-                      {{ getTZDisplayName(field.state.value) ?? "Select Timezone" }}
+                      {{ getTZDisplayName(String(field.state.value ?? "")) ?? "Select Timezone" }}
 
                       <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -851,7 +851,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
               <template #default="{ field }">
                 <div class="*:not-first:mt-1.5">
                   <Label :for="field.name">Repeat</Label>
-                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
+                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
                     <SelectTrigger>
                       <SelectValue placeholder="Select frequency" />
                     </SelectTrigger>
@@ -889,7 +889,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
               <div class="flex-1 flex items-end">
                 <span class="text-sm text-muted-foreground pb-2">
                   {{ form.getFieldValue("recurringPattern.type") || "day(s)"
-                  }}{{ form.getFieldValue("recurringPattern.interval") > 1 ? "s" : "" }}
+                  }}{{ (form.getFieldValue("recurringPattern.interval") ?? 1) > 1 ? "s" : "" }}
                 </span>
               </div>
             </div>
@@ -904,7 +904,7 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                   <Label :for="field.name">Days of the week</Label>
                   <ToggleGroup
                     :model-value="field.state.value"
-                    @update:model-value="field.handleChange"
+                    @update:model-value="(v: unknown) => field.handleChange(v as never)"
                     type="multiple"
                     variant="outline"
                     size="sm"

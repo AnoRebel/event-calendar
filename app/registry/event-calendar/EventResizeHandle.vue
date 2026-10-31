@@ -225,6 +225,7 @@ const handleTouchStart = (e: TouchEvent) => {
   e.stopPropagation()
   
   const touch = e.touches[0]
+  if (!touch) return
   isResizing.value = true
   startY.value = touch.clientY
   originalEvent.value = { ...props.event }
@@ -241,6 +242,7 @@ const handleTouchMove = (e: TouchEvent) => {
   
   e.preventDefault()
   const touch = e.touches[0]
+  if (!touch) return
   const deltaY = touch.clientY - startY.value
   const newEvent = calculateNewEventTime(deltaY)
   

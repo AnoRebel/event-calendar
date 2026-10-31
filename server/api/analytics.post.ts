@@ -1,6 +1,16 @@
+import { defineEventHandler, readBody, setResponseStatus } from "nuxt/server"
+
+interface AnalyticsPayload {
+  session?: string
+  timestamp?: string
+  metrics?: unknown[]
+  errors?: unknown[]
+  summary?: Record<string, unknown>
+}
+
 export default defineEventHandler(async (event) => {
   try {
-    const body = await readBody(event)
+    const body = await readBody<AnalyticsPayload>(event)
     
     // Validate analytics data
     if (!body || typeof body !== 'object') {

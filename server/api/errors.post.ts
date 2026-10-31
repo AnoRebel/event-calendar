@@ -1,6 +1,17 @@
+import { defineEventHandler, readBody, setResponseStatus } from "nuxt/server"
+
+interface ClientErrorReport {
+  id?: string
+  type?: string
+  message?: string
+  severity?: "low" | "medium" | "high" | "critical"
+  timestamp?: string
+  context?: Record<string, unknown>
+}
+
 export default defineEventHandler(async (event) => {
   try {
-    const errorData = await readBody(event)
+    const errorData = await readBody<ClientErrorReport>(event)
     
     // Validate error data
     if (!errorData || !errorData.message) {

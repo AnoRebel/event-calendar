@@ -1,5 +1,7 @@
 import type { Peer } from "crossws"
 import { registerBroadcaster, type EventChange } from "../utils/broadcast"
+import { setHeader, getHeader, defineWebSocketHandler } from "h3"
+import type { H3Event } from "h3"
 
 // Per-user topic so a peer only receives changes to events it's authorized to
 // see (listing is owner-scoped). Events carry their ownerId; deletes carry the

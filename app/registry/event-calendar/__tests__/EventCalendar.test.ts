@@ -165,7 +165,7 @@ describe('EventCalendar', () => {
     
     // Simulate event update
     await wrapper.vm.handleModalSubmit({
-      ...mockEvents[0],
+      ...mockEvents[0]!,
       title: 'Updated Event',
       status: 'tentative'
     }, 'edit')
