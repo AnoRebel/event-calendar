@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm"
 import { events } from "../../db/schema"
+import { defineEventHandler, getRouterParam, createError, setResponseStatus } from "h3"
 
 // DELETE /api/events/:id — remove an event. 204 on success, 404 if missing.
 export default defineEventHandler(async (event) => {

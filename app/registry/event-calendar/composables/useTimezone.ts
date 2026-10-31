@@ -1,6 +1,6 @@
 import { computed, ref, type ComputedRef } from "vue"
 import { format } from "date-fns"
-import { TZDate, tz } from "@date-fns/tz"
+import { TZDate } from "@date-fns/tz"
 import type { CalendarEvent } from "../types"
 import { getLocalTimeZone } from "@internationalized/date"
 
@@ -83,7 +83,7 @@ function getAllTimezones(): TimezoneInfo[] {
             label: `${city} (${region})`,
             offset: offsetString,
           }
-        } catch (error) {
+        } catch {
           // Fallback for problematic timezones
           return {
             timezone,
@@ -93,7 +93,7 @@ function getAllTimezones(): TimezoneInfo[] {
         }
       })
       .sort((a, b) => a.label.localeCompare(b.label))
-  } catch (error) {
+  } catch {
     // Fallback to common timezones if Intl.supportedValuesOf is not available
     console.warn("Intl.supportedValuesOf not available, using fallback timezones")
     return getCommonTimezones()
@@ -189,37 +189,65 @@ export function useTimezone(userTimezone = ref<string>("")) {
     }
   }
 
-  // Convert event to display timezone
-  const convertEventToDisplayTimezone = (event: CalendarEvent) => {
-    if (event.allDay) return event // All-day events don't need timezone conversion
+  // The wall-clock time `date` shows in `timezone`, as a plain Date whose local
+  // fields (year … minutes) carry that wall-clock time. Used to prefill the event
+  // dialog in the timezone the event was entered in.
+  const toWallClock = (date: Date, timezone: string): Date => {
+    try {
+      const z = new TZDate(date, timezone)
+      return new Date(z.getFullYear(), z.getMonth(), z.getDate(), z.getHours(), z.getMinutes(), z.getSeconds(), z.getMilliseconds())
+    } catch {
+      return new Date(date)
+    }
+  }
 
+  // The instant at which `timezone`'s clock reads the local fields of `date`.
+  // Inverse of toWallClock: turns what the user typed into the dialog (with the
+  // chosen timezone) into the absolute time that is stored.
+  const fromWallClock = (date: Date, timezone: string): Date => {
+    try {
+      const z = new TZDate(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds(), timezone)
+      return new Date(z.getTime())
+    } catch {
+      return new Date(date)
+    }
+  }
+
+  // Prepare an event for editing: its times as wall-clock times in the timezone
+  // it was entered in (the viewer's own timezone when none was recorded).
+  const convertEventToDisplayTimezone = (event: CalendarEvent): CalendarEvent => {
+    if (event.allDay) return event // All-day events are date-only.
     const eventTimezone = event.timezone || userTimezone.value
-
     return {
       ...event,
-      startDate: toUserTimezone(event.startDate, eventTimezone),
-      endDate: toUserTimezone(event.endDate, eventTimezone),
+      startDate: toWallClock(new Date(event.startDate), eventTimezone),
+      endDate: toWallClock(new Date(event.endDate), eventTimezone),
     }
   }
 
-  // Convert event from display timezone for storage
-  const convertEventFromDisplayTimezone = (event: CalendarEvent) => {
-    if (event.allDay) return event // All-day events don't need timezone conversion
-
+  // Turn dialog input back into absolute times: the entered wall-clock times are
+  // interpreted in the event's chosen timezone.
+  const convertEventFromDisplayTimezone = (event: CalendarEvent): CalendarEvent => {
+    if (event.allDay) return event
     const targetTimezone = event.timezone || userTimezone.value
-
     return {
       ...event,
-      startDate: fromUserTimezone(event.startDate, targetTimezone),
-      endDate: fromUserTimezone(event.endDate, targetTimezone),
+      startDate: fromWallClock(new Date(event.startDate), targetTimezone),
+      endDate: fromWallClock(new Date(event.endDate), targetTimezone),
     }
   }
 
-  // Process events array with timezone conversion
+  // Events are stored as absolute instants and the grid lays them out in the
+  // viewer's local time, so display needs no conversion; dates are normalised to
+  // Date objects in case a host passes ISO strings.
   const processEventsWithTimezone = (events: ComputedRef<CalendarEvent[]>) => {
-    return computed(() => {
-      return events.value.map(event => convertEventToDisplayTimezone(event))
-    })
+    return computed(() =>
+      events.value.map(event => ({
+        ...event,
+        startDate: event.startDate instanceof Date ? event.startDate : new Date(event.startDate),
+        endDate: event.endDate instanceof Date ? event.endDate : new Date(event.endDate),
+      })),
+    )
   }
 
   // Get timezone-aware time display
@@ -267,6 +295,8 @@ export function useTimezone(userTimezone = ref<string>("")) {
     fromUserTimezone,
     formatInTimezone,
     getTimezoneOffset,
+    toWallClock,
+    fromWallClock,
     convertEventToDisplayTimezone,
     convertEventFromDisplayTimezone,
     processEventsWithTimezone,

@@ -1,66 +1,77 @@
 <script setup lang="ts">
-import { onMounted } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
+import { format, isValid, parseISO } from "date-fns"
 import { toast } from "vue-sonner"
-import type { CalendarEvent } from "@/registry/event-calendar/types"
-import { useCalendarData } from "~/composables/useCalendarData"
-import { useCalendarRealtime } from "~/composables/useCalendarRealtime"
+import { CloudOff, RefreshCw } from "@lucide/vue"
+import { Button } from "@/components/ui/button"
+import type { CalendarEvent, ViewMode } from "~/registry/event-calendar/types"
 import EventCalendar from "~/registry/event-calendar/EventCalendar.vue"
 
-// Calendar data is owned by useCalendarData, which persists to /api/events.
-// EventCalendar stays a controlled component: events flow in via the prop and
-// mutations come back as emits handled below.
-const { events, isLoading, loadError, load, createEvent, updateEvent, deleteEvent, applyRemote, isOwnEcho } =
-  useCalendarData()
+definePageMeta({ middleware: "auth" })
+useHead({ title: "Calendar" })
 
-// Auth: the calendar is per-user, so gate it behind a session.
-const { loggedIn, user, clear: clearSession } = useUserSession()
+// Events live in TanStack Query (see useCalendarEvents). EventCalendar stays a
+// controlled component: events in via the prop, intents out via emits.
+const { events, isLoading, error, refetch, createEvent, updateEvent, deleteEvent, applyRemote, isOwnEcho } =
+  useCalendarEvents()
+const { collaboration, recurringEvents } = useFeatureFlags()
+const { loggedIn } = useUserSession()
 
-// Feature flags (runtime).
-const { collaboration: collaborationEnabled, recurringEvents: recurringEnabled } = useFeatureFlags()
+// Optional realtime sync between a user's tabs and devices; a reconnect resyncs.
+const realtime = useCalendarRealtime(applyRemote, isOwnEcho, () => refetch())
+if (import.meta.client) {
+  watch(
+    loggedIn,
+    on => {
+      if (on && collaboration) realtime.start()
+      else realtime.stop()
+    },
+    { immediate: true },
+  )
+}
 
-// Real-time collaboration is feature-flagged; reconnect resyncs by reloading.
-const realtime = useCalendarRealtime(applyRemote, isOwnEcho, () => {
-  load().catch(() => {})
+// --- Deep links: ?view=week&date=2026-11-03&action=add ---------------------------
+const route = useRoute()
+const router = useRouter()
+const VIEWS: ViewMode[] = ["month", "week", "day", "agenda"]
+
+const initialView = VIEWS.includes(route.query.view as ViewMode) ? (route.query.view as ViewMode) : "month"
+const parsedDate = typeof route.query.date === "string" ? parseISO(route.query.date) : null
+const view = ref<ViewMode>(initialView)
+const date = ref<Date>(parsedDate && isValid(parsedDate) ? parsedDate : new Date())
+
+// Keep the URL shareable: reflect the view and date without adding history entries.
+watch([view, date], ([v, d]) => {
+  const query = { ...route.query, view: v, date: format(d, "yyyy-MM-dd") }
+  if (query.view === route.query.view && query.date === route.query.date) return
+  router.replace({ query })
 })
 
-const onAuthenticated = async () => {
+const calendar = ref<InstanceType<typeof EventCalendar> | null>(null)
+onMounted(() => {
+  if (route.query.action === "add") {
+    calendar.value?.openAddModal()
+    const { action: _action, ...rest } = route.query
+    router.replace({ query: rest })
+  }
+})
+
+// --- Mutations ---------------------------------------------------------------------
+const handleEventAdd = async (event: CalendarEvent) => {
   try {
-    await load()
-    if (collaborationEnabled) realtime.start()
-  } catch {
-    toast.error("Could not load your events", { description: "Please try again." })
+    await createEvent(event)
+    toast.success(`Added "${event.title}"`, { description: format(event.startDate, "EEE, MMM d · p") })
+  } catch (err) {
+    toast.error("Couldn't add the event", { description: errorMessage(err) })
   }
 }
 
-const signOut = async () => {
-  realtime.stop()
-  await $fetch("/api/auth/logout", { method: "POST" })
-  await clearSession()
-  events.value = []
-  toast.success("Signed out")
-}
-
-const handleEventAdd = async (newEvent: CalendarEvent) => {
+const handleEventUpdate = async (event: CalendarEvent) => {
   try {
-    await createEvent(newEvent)
-    toast.success(`Event "${newEvent.title}" created`, {
-      description: newEvent.location ? `Location: ${newEvent.location}` : undefined,
-    })
-  } catch (error) {
-    toast.error("Error creating event", {
-      description: error instanceof Error ? error.message : "Failed to create event",
-    })
-  }
-}
-
-const handleEventUpdate = async (updatedEvent: CalendarEvent) => {
-  try {
-    await updateEvent(updatedEvent)
-    toast.success(`Event "${updatedEvent.title}" updated`, { description: "Changes have been saved" })
-  } catch (error) {
-    toast.error("Error updating event", {
-      description: error instanceof Error ? error.message : "Failed to update event",
-    })
+    await updateEvent(event)
+    toast.success(`Saved "${event.title}"`)
+  } catch (err) {
+    toast.error("Couldn't save your changes", { description: errorMessage(err) })
   }
 }
 
@@ -68,92 +79,36 @@ const handleEventDelete = async (eventId: string) => {
   const deleted = events.value.find(e => e.id === eventId)
   try {
     await deleteEvent(eventId)
-    toast.success(deleted ? `Event "${deleted.title}" deleted` : "Event deleted", {
-      description: "Event has been permanently removed",
-    })
-  } catch (error) {
-    toast.error("Error deleting event", {
-      description: error instanceof Error ? error.message : "Failed to delete event",
-    })
+    toast.success(deleted ? `Deleted "${deleted.title}"` : "Event deleted")
+  } catch (err) {
+    toast.error("Couldn't delete the event", { description: errorMessage(err) })
   }
 }
 
-// Load events on mount only when already authenticated (a returning session).
-onMounted(async () => {
-  if (loggedIn.value) {
-    try {
-      await load()
-      if (collaborationEnabled) realtime.start()
-    } catch {
-      toast.error("Could not load your events", { description: "Please try again." })
-    }
-  }
-})
+const showError = computed(() => !!error.value && events.value.length === 0)
 </script>
 
 <template>
-  <div>
-    <!-- Logged out: show the auth panel. -->
-    <AuthPanel v-if="!loggedIn" @authenticated="onAuthenticated" />
+  <div class="mx-auto flex w-full max-w-screen-2xl flex-col px-3 pt-3 sm:px-4 sm:pt-4">
+    <div v-if="showError" class="surface-panel flex flex-col items-center gap-3 px-6 py-16 text-center" role="alert">
+      <CloudOff class="size-8 text-danger-content" aria-hidden="true" />
+      <h1 class="mb-0 text-lg font-semibold">We couldn't load your events</h1>
+      <p class="mb-0 max-w-sm text-sm text-content-secondary">{{ errorMessage(error) }}</p>
+      <Button variant="outline" type="button" @click="refetch()"><RefreshCw /> Try again</Button>
+    </div>
 
-    <!-- Logged in: the calendar. -->
-    <template v-else>
-      <div class="mx-auto flex max-w-full items-center justify-end gap-3 px-4 pt-4 md:px-6 lg:px-8">
-        <NuxtLink
-          to="/docs"
-          class="mr-auto inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Icon name="lucide:book-open" size="14" />
-          Docs
-        </NuxtLink>
-        <span class="text-sm text-muted-foreground">{{ user?.name || user?.email }}</span>
-        <button
-          class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input px-2.5 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground"
-          @click="signOut"
-        >
-          <Icon name="lucide:log-out" size="14" />
-          Sign out
-        </button>
-      </div>
-
-      <div class="mx-auto p-4 md:p-6 lg:p-8">
-        <!-- Loading state on first load -->
-        <div
-          v-if="isLoading && events.length === 0"
-          class="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground"
-          role="status"
-          aria-live="polite"
-        >
-          <Icon name="lucide:loader-circle" size="28" class="animate-spin" />
-          <p class="text-sm">Loading your events…</p>
-        </div>
-
-        <!-- Load error state -->
-        <div
-          v-else-if="loadError && events.length === 0"
-          class="flex flex-col items-center justify-center gap-3 py-24 text-center"
-        >
-          <Icon name="lucide:triangle-alert" size="28" class="text-destructive" />
-          <p class="text-sm text-muted-foreground">We couldn't load your events.</p>
-          <button class="text-sm font-medium text-primary underline-offset-4 hover:underline" @click="load">
-            Try again
-          </button>
-        </div>
-
-        <!-- Calendar (also renders its own empty state when there are no events) -->
-        <EventCalendar
-          v-else
-          :events="events"
-          :features="{ recurringEvents: recurringEnabled }"
-          @event-add="handleEventAdd"
-          @event-update="handleEventUpdate"
-          @event-delete="handleEventDelete"
-        >
-          <template #header-actions>
-            <DarkModeToggle />
-          </template>
-        </EventCalendar>
-      </div>
-    </template>
+    <EventCalendar
+      v-else
+      ref="calendar"
+      v-model:view="view"
+      v-model:date="date"
+      :events="events"
+      :loading="isLoading"
+      :features="{ recurringEvents }"
+      class="h-[calc(100dvh-10.5rem)] min-h-[26rem] md:h-[calc(100dvh-6.5rem)]"
+      @event-add="handleEventAdd"
+      @event-update="handleEventUpdate"
+      @event-delete="handleEventDelete"
+    />
   </div>
 </template>

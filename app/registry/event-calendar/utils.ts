@@ -5,11 +5,11 @@ import type { CalendarEvent } from './types'
  */
 
 // Debounce function for performance optimization
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: never[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null
+  let timeout: ReturnType<typeof setTimeout> | null = null
   
   return (...args: Parameters<T>) => {
     if (timeout) clearTimeout(timeout)
@@ -18,7 +18,7 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 // Throttle function for drag operations
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: never[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -34,7 +34,7 @@ export function throttle<T extends (...args: any[]) => any>(
 }
 
 // Memoization for expensive calculations
-export function memoize<T extends (...args: any[]) => any>(fn: T): T {
+export function memoize<T extends (...args: never[]) => unknown>(fn: T): T {
   const cache = new Map()
   
   return ((...args: Parameters<T>) => {
@@ -99,7 +99,7 @@ export function cleanupEventListeners(
 
 // Optimize color calculations
 export const getOptimizedColorClasses = memoize((color: string) => {
-  const colorMap: Record<string, any> = {
+  const colorMap: Record<string, Record<string, string>> = {
     sky: {
       bg: 'bg-sky-200 dark:bg-sky-700',
       border: 'border-sky-400 dark:border-sky-500',

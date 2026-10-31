@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { addDays, setHours, setMinutes, subDays, startOfDay } from "date-fns"
 import { eq } from "drizzle-orm"
 import { events, users } from "../db/schema"
+import { useRuntimeConfig } from "nuxt/server"
 
 // The demo account and its sample data. ensureDemoUser() creates the user if
 // needed; reseedDemoEvents() wipes and repopulates its events (used on login and

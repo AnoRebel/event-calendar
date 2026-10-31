@@ -1,3 +1,5 @@
+import { defineNitroPlugin } from "nitropack/runtime"
+
 // nuxt-authorization needs to know how to resolve the current user on the server.
 // Wire it to the nuxt-auth-utils session so abilities receive the session user.
 export default defineNitroPlugin((nitroApp) => {

@@ -150,9 +150,9 @@ describe('useEventStatus', () => {
     const { processEventsWithStatus } = useEventStatus(events)
     
     const processedEvents = processEventsWithStatus.value
-    expect(processedEvents[0].computedStatus).toBe('past')
-    expect(processedEvents[1].computedStatus).toBe('cancelled')
-    expect(processedEvents[0].statusIndicator).toBe('⏰')
-    expect(processedEvents[1].statusIndicator).toBe('✕')
+    expect(processedEvents[0]!.computedStatus).toBe('past')
+    expect(processedEvents[1]!.computedStatus).toBe('cancelled')
+    expect(processedEvents[0]!.statusIndicator).toBe('⏰')
+    expect(processedEvents[1]!.statusIndicator).toBe('✕')
   })
 })

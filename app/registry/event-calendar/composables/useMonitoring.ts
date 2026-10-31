@@ -1,5 +1,11 @@
 import { ref, readonly, onMounted } from 'vue'
 
+// Layout Instability API entries (not in TypeScript's DOM lib yet).
+interface LayoutShiftEntry extends PerformanceEntry {
+  value: number
+  hadRecentInput: boolean
+}
+
 interface PerformanceMetric {
   name: string
   value: number
@@ -73,10 +79,10 @@ export function useMonitoring(
       try {
         const observer = new PerformanceObserver((list) => {
           const entries = list.getEntries()
-          entries.forEach((entry: any) => {
+          entries.forEach((entry: PerformanceEntry) => {
             recordMetric({
               name: 'web_vitals_fid',
-              value: entry.processingStart - entry.startTime,
+              value: (entry as PerformanceEventTiming).processingStart - entry.startTime,
               timestamp: new Date(),
               tags: { type: 'core_web_vital' }
             })
@@ -92,9 +98,10 @@ export function useMonitoring(
         let clsValue = 0
         const observer = new PerformanceObserver((list) => {
           const entries = list.getEntries()
-          entries.forEach((entry: any) => {
-            if (!entry.hadRecentInput) {
-              clsValue += entry.value
+          entries.forEach((entry: PerformanceEntry) => {
+            const shift = entry as LayoutShiftEntry
+            if (!shift.hadRecentInput) {
+              clsValue += shift.value
             }
           })
           
@@ -181,7 +188,7 @@ export function useMonitoring(
                 tags: {
                   type: 'resource_performance',
                   resource: entry.name,
-                  resource_type: (entry as any).initiatorType
+                  resource_type: (entry as PerformanceResourceTiming).initiatorType
                 }
               })
             }
@@ -258,7 +265,7 @@ export function useMonitoring(
   }
 
   // Calendar-specific performance tracking
-  const trackCalendarPerformance = (operation: string, duration: number, metadata?: Record<string, any>): void => {
+  const trackCalendarPerformance = (operation: string, duration: number, metadata?: Record<string, unknown>): void => {
     recordMetric({
       name: `calendar_${operation}_duration`,
       value: duration,
@@ -284,7 +291,7 @@ export function useMonitoring(
     error: string
     component?: string
     userAgent?: string
-    additional?: any
+    additional?: unknown
   }): void => {
     const errorKey = `${errorData.error}_${errorData.component}`
     const existing = errors.value.get(errorKey)
@@ -307,7 +314,7 @@ export function useMonitoring(
   const measureOperation = async <T>(
     operationName: string,
     operation: () => Promise<T> | T,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<T> => {
     const startTime = performance.now()
     

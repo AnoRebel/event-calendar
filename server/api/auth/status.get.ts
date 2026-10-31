@@ -1,5 +1,6 @@
 import { ne } from "drizzle-orm"
 import { users } from "../../db/schema"
+import { defineEventHandler, useRuntimeConfig } from "nuxt/server"
 
 // GET /api/auth/status — public. Tells the client how registration should behave
 // so the UI can adapt (bootstrap the first account, show/hide the invite field,
@@ -7,7 +8,7 @@ import { users } from "../../db/schema"
 export default defineEventHandler(async () => {
   const { openRegistration, demo } = useRuntimeConfig()
 
-  let needsBootstrap = false
+  let needsBootstrap: boolean
   try {
     // Exclude the demo account so the first REAL human can still bootstrap.
     const demoEmail = demo?.email?.trim().toLowerCase() || ""

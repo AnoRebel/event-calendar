@@ -1,3 +1,5 @@
+import { defineEventHandler, setResponseStatus, useRuntimeConfig } from "nuxt/server"
+
 export default defineEventHandler(async (event) => {
   const startTime = Date.now()
 
@@ -5,7 +7,7 @@ export default defineEventHandler(async (event) => {
     status: "healthy" as "healthy" | "degraded" | "unhealthy",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    version: process.env.npm_package_version || "1.0.0",
+    version: useRuntimeConfig().public.version,
     environment: process.env.NODE_ENV || "development",
     checks: {
       database: "healthy" as "healthy" | "unhealthy",

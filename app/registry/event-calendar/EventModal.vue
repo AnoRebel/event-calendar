@@ -2,9 +2,10 @@
 import { ref, computed, watch } from "vue"
 import { onKeyStroke } from "@vueuse/core"
 import { useForm } from "@tanstack/vue-form"
+import * as v from "valibot"
 import { toDate } from "reka-ui/date"
 import { fromDate, CalendarDate, type DateValue, today, getLocalTimeZone } from "@internationalized/date"
-import { format, addHours, isBefore } from "date-fns"
+import { format, addHours, addMinutes, isBefore, startOfHour, startOfDay } from "date-fns"
 import { v4 as uuidv4 } from "uuid"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -13,7 +14,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -27,9 +27,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import type { CalendarEvent, EventColor, EventStatus } from "./types"
-import { DefaultEndHour, DefaultStartHour, EndHour, StartHour } from "./constants"
+import { EndHour, StartHour } from "./constants"
 import { useTimezone } from "./composables/useTimezone"
-import { Calendar as CalendarIcon, MapPin, Globe, ChevronsUpDown, Check, Repeat } from "lucide-vue-next"
+import { Calendar as CalendarIcon, MapPin, Globe, ChevronsUpDown, Check, Repeat } from "@lucide/vue"
 
 const props = defineProps<{
   isOpen: boolean
@@ -50,7 +50,7 @@ const emit = defineEmits<{
 
 // Handle ESC key to close modal
 // Initialize timezone support
-const { userTimezone, commonTimezones, convertEventFromDisplayTimezone } = useTimezone()
+const { userTimezone, commonTimezones, convertEventFromDisplayTimezone, detectUserTimezone } = useTimezone()
 
 onKeyStroke("Escape", e => {
   if (props.isOpen) {
@@ -67,6 +67,7 @@ const startDateOpen = ref(false)
 const endDateOpen = ref(false)
 const isAllDay = ref(props.isAllDayFromCell || false)
 const isRecurring = ref(false)
+const confirmingDelete = ref(false)
 const isTZOpen = ref(false)
 const recurringEndType = ref("never")
 const startDateValue = ref<Date | undefined>(undefined)
@@ -94,7 +95,7 @@ const convertToDateValue = (date: Date, timezone: string = "UTC"): DateValue => 
     // Method 1: Using fromDate and converting to CalendarDate
     const zonedDateTime = fromDate(date, timezone)
     return new CalendarDate(zonedDateTime.year, zonedDateTime.month, zonedDateTime.day)
-  } catch (error) {
+  } catch {
     // Fallback: Manual construction
     return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate())
   }
@@ -103,7 +104,8 @@ const convertToDateValue = (date: Date, timezone: string = "UTC"): DateValue => 
 // Memoize time options so they're only calculated once
 const timeOptions = computed(() => {
   const options = []
-  for (let hour = StartHour; hour <= EndHour; hour++) {
+  // EndHour is exclusive (24 means "until midnight"), so the last slot is 23:45.
+  for (let hour = StartHour; hour < EndHour; hour++) {
     for (let minute = 0; minute < 60; minute += 15) {
       const formattedHour = hour.toString().padStart(2, "0")
       const formattedMinute = minute.toString().padStart(2, "0")
@@ -123,27 +125,47 @@ const getTZDisplayName = (timezone: string) => {
 }
 
 // Helper to ensure proper Date object for Calendar component
-const ensureValidDate = (value: any): Date => {
+const ensureValidDate = (value: unknown): Date => {
   if (!value) return new Date()
-  if (value instanceof Date && !isNaN(value.getTime())) return value
-  if ("calendar" in value) return toDate(value)
-  const parsed = new Date(value)
-  return !isNaN(parsed.getTime()) ? parsed : new Date()
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? new Date() : value
+  // reka-ui calendars emit @internationalized/date values.
+  if (typeof value === "object" && "calendar" in value) return toDate(value as DateValue)
+  const parsed = new Date(value as string | number)
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed
 }
 
-// Filter timezones based on search term
-const filteredTimezones = computed(() => {
-  if (!timezoneSearchTerm.value) {
-    return commonTimezones
+
+// Default start/end for a new event. A slot click (a target with a time) starts
+// there; otherwise the next full hour today (or 09:00 on another day). Events
+// last an hour, rounded to the 15-minute grid the time pickers offer.
+const defaultTimesFor = (target?: Date | null) => {
+  const now = new Date()
+  let start: Date
+  if (target && (target.getHours() !== 0 || target.getMinutes() !== 0)) {
+    start = new Date(target)
+    start.setMinutes(Math.floor(start.getMinutes() / 15) * 15, 0, 0)
+  } else if (!target || startOfDay(target).getTime() === startOfDay(now).getTime()) {
+    start = startOfHour(addHours(now, 1))
+    // Late evening: keep the event on the chosen day.
+    if (start.getDate() !== now.getDate()) start = addMinutes(startOfDay(addHours(now, 24)), -60)
+  } else {
+    start = new Date(target)
+    start.setHours(9, 0, 0, 0)
   }
-  const searchLower = timezoneSearchTerm.value.toLowerCase()
-  return commonTimezones.filter(
-    tz =>
-      tz.label.toLowerCase().includes(searchLower) ||
-      tz.timezone.toLowerCase().includes(searchLower) ||
-      tz.offset.toLowerCase().includes(searchLower)
-  )
-})
+  const end = addHours(start, 1)
+  return { start, end, startTime: formatTimeForInput(start), endTime: formatTimeForInput(end) }
+}
+
+// Field rules (valibot, via TanStack Form's Standard Schema support). They match
+// the server's event schema, so the dialog never submits what the API rejects.
+const titleSchema = v.pipe(
+  v.string(),
+  v.trim(),
+  v.minLength(1, "Give the event a title"),
+  v.maxLength(200, "Keep the title under 200 characters"),
+)
+const locationSchema = v.pipe(v.string(), v.maxLength(500, "Keep the location under 500 characters"))
+const descriptionSchema = v.pipe(v.string(), v.maxLength(5000, "Keep the notes under 5,000 characters"))
 
 const colorOptions: Array<{
   value: EventColor
@@ -196,8 +218,8 @@ const form = useForm({
     description: "",
     startDate: ensureValidDate(props.targetDate),
     endDate: ensureValidDate(props.targetDate ? addHours(new Date(props.targetDate), 1) : addHours(new Date(), 1)),
-    startTime: `${DefaultStartHour}:00`,
-    endTime: `${DefaultEndHour}:00`,
+    startTime: defaultTimesFor(props.targetDate).startTime,
+    endTime: defaultTimesFor(props.targetDate).endTime,
     allDay: props.isAllDayFromCell || false,
     color: "sky",
     location: "",
@@ -239,8 +261,7 @@ const form = useForm({
       return
     }
 
-    // Use generic title if empty
-    const eventTitle = value.title.trim() ? value.title : "(no title)"
+    const eventTitle = value.title.trim()
 
     // Process recurring pattern
     let recurringPattern = undefined
@@ -316,6 +337,9 @@ watch(
   ([isOpenNew, modeNew, eventDataNew, targetDateNew, isAllDayNew]) => {
     if (isOpenNew) {
       clearError() // Clear any previous errors when opening modal
+      confirmingDelete.value = false
+      // The browser's zone can change between openings (travel, OS settings).
+      userTimezone.value = detectUserTimezone()
       if (modeNew === "edit" && eventDataNew && typeof eventDataNew === "object" && "startDate" in eventDataNew) {
         // Determine the recurring end type for the UI
         let recurringEndType = "never"
@@ -335,6 +359,8 @@ watch(
           ? ensureValidDate(eventDataNew.recurringPattern.endDate)
           : undefined
         timezoneSearchTerm.value = ""
+        isAllDay.value = Boolean(eventDataNew.allDay)
+        isRecurring.value = Boolean(eventDataNew.isRecurring)
 
         form.reset({
           ...eventDataNew,
@@ -354,14 +380,17 @@ watch(
         })
       } else {
         // 'add' mode or reset
-        const targetDate = ensureValidDate(targetDateNew)
-        const defaultEndDate = ensureValidDate(addHours(targetDate, 1))
+        const defaults = defaultTimesFor(targetDateNew ? ensureValidDate(targetDateNew) : null)
+        const targetDate = defaults.start
+        const defaultEndDate = defaults.end
 
         // Update ref values
         startDateValue.value = targetDate
         endDateValue.value = defaultEndDate
         recurringEndDateValue.value = undefined
         timezoneSearchTerm.value = ""
+        isAllDay.value = Boolean(isAllDayNew)
+        isRecurring.value = false
 
         form.reset({
           id: "",
@@ -374,8 +403,8 @@ watch(
           location: "",
           status: "confirmed" as EventStatus,
           timezone: userTimezone.value,
-          startTime: `${DefaultStartHour}:00`,
-          endTime: `${DefaultEndHour}:00`,
+          startTime: defaults.startTime,
+          endTime: defaults.endTime,
           isRecurring: false,
           recurringPattern: {
             type: "daily",
@@ -435,394 +464,351 @@ const closePopup = () => {
 }
 
 const handleDelete = () => {
+  // First press asks for confirmation; the second deletes.
+  if (!confirmingDelete.value) {
+    confirmingDelete.value = true
+    return
+  }
   if (props.mode === "edit" && props.eventData?.id) {
     emit("deleteEvent", props.eventData.id)
     closePopup()
   }
 }
 
-// Helper for datetime-local input formatting
-const formatDateTimeLocal = (date: Date | string | undefined) => {
-  if (!date) return ""
-  return format(new Date(date), `yyyy-MM-dd'T'HH:mm`)
+// Short enough for a phone's half-width column; the year only when it isn't this year.
+const dateLabel = (value: unknown) => {
+  if (!value) return "Pick a date"
+  const date = ensureValidDate(value)
+  return format(date, date.getFullYear() === new Date().getFullYear() ? "EEE, MMM d" : "MMM d, yyyy")
 }
+const fieldClass = "grid min-w-0 gap-1.5"
+// Standard Schema validators report issue objects; show their messages.
+const fieldErrors = (errors: unknown[]) =>
+  errors
+    .flatMap(e => (Array.isArray(e) ? e : [e]))
+    .map(e => (typeof e === "string" ? e : (e as { message?: string })?.message))
+    .filter(Boolean)
+    .join(", ")
 </script>
 
 <template>
   <Dialog :open="isOpen" @update:open="closePopup">
-    <DialogContent class="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>{{ mode === "add" ? "Create Event" : "Edit Event" }}</DialogTitle>
-        <DialogDescription class="sr-only">
-          {{ mode === "add" ? "Add a new event to your calendar" : "Edit the details of this event" }}
-        </DialogDescription>
-      </DialogHeader>
-      <div v-if="error" class="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm">
-        {{ error }}
-      </div>
-      <form @submit.prevent="form.handleSubmit">
-        <div class="grid gap-4 py-4">
-          <form.Field name="title">
+    <!-- The dialog scrolls its own body between a fixed header and footer, so it
+         fits the screen with any DialogContent (the app's or shadcn's stock one). -->
+    <DialogContent class="flex max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[calc(100dvh-4rem)] sm:max-w-xl sm:p-0">
+      <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="form.handleSubmit">
+        <DialogHeader class="shrink-0 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
+          <DialogTitle>{{ mode === "add" ? "New event" : "Edit event" }}</DialogTitle>
+          <DialogDescription>
+            {{ mode === "add" ? "Add an event to your calendar." : "Change the details of this event." }}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="grid min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6">
+          <p v-if="error" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {{ error }}
+          </p>
+
+          <form.Field name="title" :validators="{ onBlur: titleSchema, onSubmit: titleSchema }">
             <template #default="{ field }">
-              <div class="*:not-first:mt-1.5">
-                <Label :for="field.name">Title <span class="text-destructive">*</span></Label>
+              <div :class="fieldClass">
+                <Label :for="field.name">Title <span class="text-destructive" aria-hidden="true">*</span></Label>
                 <Input
                   :id="field.name"
                   :name="field.name"
                   :model-value="field.state.value"
-                  placeholder="Event title"
+                  placeholder="What's happening?"
+                  autocomplete="off"
                   @blur="field.handleBlur"
                   @update:model-value="(v) => field.handleChange(String(v))"
                 />
-                <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                  {{ field.state.meta.errors.join(", ") }}
+                <p v-if="!field.state.meta.isValid" class="text-xs text-destructive">
+                  {{ fieldErrors(field.state.meta.errors) }}
                 </p>
               </div>
             </template>
           </form.Field>
 
-          <form.Field name="description">
-            <template #default="{ field }">
-              <div class="*:not-first:mt-1.5">
-                <Label :for="field.name">Description</Label>
-                <Textarea
-                  :id="field.name"
-                  :name="field.name"
-                  :model-value="field.state.value"
-                  placeholder="Event description"
-                  @blur="field.handleBlur"
-                  @update:model-value="(v) => field.handleChange(String(v))"
-                />
-              </div>
-            </template>
-          </form.Field>
-
-          <div class="flex gap-4">
-            <form.Field name="startDate">
-              <template #default="{ field }">
-                <div class="flex-1 *:not-first:mt-1.5">
-                  <Label :for="field.name">Start Date</Label>
-                  <Popover :open="startDateOpen" @update:open="val => (startDateOpen = val)">
-                    <PopoverTrigger as-child>
-                      <Button
-                        id="start-date"
-                        variant="outline"
-                        :class="
-                          cn(
-                            'group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]',
-                            !form.getFieldValue('startDate') && 'text-muted-foreground'
-                          )
-                        "
-                      >
-                        <span :class="cn('truncate', !form.getFieldValue('startDate') && 'text-muted-foreground')">
-                          {{
-                            form.getFieldValue("startDate")
-                              ? format(form.getFieldValue("startDate"), "PPP")
-                              : "Pick a date"
-                          }}
-                        </span>
-                        <CalendarIcon
-                          :size="16"
-                          class="text-muted-foreground/80 shrink-0"
-                          aria-hidden="true"
-                        />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent class="w-auto p-2" align="start">
-                      <Calendar
-                        mode="single"
-                        @update:model-value="
-                          date => {
-                            if (date) {
-                              const newDate = toDate(date)
-                              startDateValue = newDate
-                              field.handleChange(newDate)
-                              // If end date is before the new start date, update it to match the start date
-                              if (isBefore(endDateValue ?? new Date(), newDate)) {
-                                endDateValue = newDate
-                                form.setFieldValue('endDate', newDate)
+          <!-- When: date + time pairs. Grid tracks with minmax(0, …) can never
+               push the dialog wider than the screen. -->
+          <fieldset class="grid min-w-0 gap-3 rounded-lg border border-border bg-muted/40 p-3 sm:p-4">
+            <legend class="sr-only">When</legend>
+            <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,8.5rem)] gap-3" :class="isAllDay && 'grid-cols-1'">
+              <form.Field name="startDate">
+                <template #default="{ field }">
+                  <div :class="fieldClass">
+                    <Label for="start-date">Starts</Label>
+                    <Popover :open="startDateOpen" @update:open="val => (startDateOpen = val)">
+                      <PopoverTrigger as-child>
+                        <Button id="start-date" type="button" variant="outline" class="w-full min-w-0 justify-between px-3 font-normal">
+                          <span class="truncate">{{ dateLabel(form.getFieldValue("startDate")) }}</span>
+                          <CalendarIcon :size="16" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent class="w-auto p-2" align="start">
+                        <Calendar
+                          mode="single"
+                          @update:model-value="
+                            date => {
+                              if (date) {
+                                const newDate = toDate(date)
+                                startDateValue = newDate
+                                field.handleChange(newDate)
+                                // Keep the end on or after the start.
+                                if (isBefore(endDateValue ?? new Date(), newDate)) {
+                                  endDateValue = newDate
+                                  form.setFieldValue('endDate', newDate)
+                                }
+                                startDateOpen = false
                               }
-                              startDateOpen = false
                             }
-                          }
-                        "
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                    {{ field.state.meta.errors.join(", ") }}
-                  </p>
-                </div>
-              </template>
-            </form.Field>
+                          "
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </template>
+              </form.Field>
 
-            <form.Field v-if="!isAllDay" name="startTime">
-              <template #default="{ field }">
-                <div class="min-w-28 *:not-first:mt-1.5">
-                  <Label :for="field.name">Start Time</Label>
-                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                    {{ field.state.meta.errors.join(", ") }}
-                  </p>
-                </div>
-              </template>
-            </form.Field>
-          </div>
+              <form.Field v-if="!isAllDay" name="startTime">
+                <template #default="{ field }">
+                  <div :class="fieldClass">
+                    <Label :for="field.name">Time</Label>
+                    <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
+                      <SelectTrigger :id="field.name" class="w-full min-w-0" aria-label="Start time">
+                        <SelectValue placeholder="Time" />
+                      </SelectTrigger>
+                      <SelectContent class="max-h-72">
+                        <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value">
+                          {{ option.label }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </template>
+              </form.Field>
+            </div>
 
-          <div class="flex gap-4">
-            <form.Field name="endDate">
-              <template #default="{ field }">
-                <div class="flex-1 *:not-first:mt-1.5">
-                  <Label :for="field.name">End Date</Label>
-                  <Popover :open="endDateOpen" @update:open="val => (endDateOpen = val)">
+            <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,8.5rem)] gap-3" :class="isAllDay && 'grid-cols-1'">
+              <form.Field name="endDate">
+                <template #default="{ field }">
+                  <div :class="fieldClass">
+                    <Label for="end-date">Ends</Label>
+                    <Popover :open="endDateOpen" @update:open="val => (endDateOpen = val)">
+                      <PopoverTrigger as-child>
+                        <Button id="end-date" type="button" variant="outline" class="w-full min-w-0 justify-between px-3 font-normal">
+                          <span class="truncate">{{ dateLabel(form.getFieldValue("endDate")) }}</span>
+                          <CalendarIcon :size="16" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent class="w-auto p-2" align="start">
+                        <Calendar
+                          mode="single"
+                          :min-value="convertToDateValue(startDateValue ?? new Date(), getLocalTimeZone())"
+                          @update:model-value="
+                            date => {
+                              if (date) {
+                                const newDate = toDate(date)
+                                endDateValue = newDate
+                                field.handleChange(newDate)
+                                endDateOpen = false
+                              }
+                            }
+                          "
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </template>
+              </form.Field>
+
+              <form.Field v-if="!isAllDay" name="endTime">
+                <template #default="{ field }">
+                  <div :class="fieldClass">
+                    <Label :for="field.name">Time</Label>
+                    <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
+                      <SelectTrigger :id="field.name" class="w-full min-w-0" aria-label="End time">
+                        <SelectValue placeholder="Time" />
+                      </SelectTrigger>
+                      <SelectContent class="max-h-72">
+                        <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value">
+                          {{ option.label }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </template>
+              </form.Field>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+              <form.Field name="allDay">
+                <template #default="{ field }">
+                  <div class="flex min-h-11 items-center gap-2">
+                    <Checkbox
+                      :id="field.name"
+                      :name="field.name"
+                      :model-value="field.state.value"
+                      @blur="field.handleBlur"
+                      @update:model-value="
+                        val => {
+                          isAllDay = val === true
+                          field.handleChange(val === true)
+                        }
+                      "
+                    />
+                    <Label :for="field.name" class="font-normal">All day</Label>
+                  </div>
+                </template>
+              </form.Field>
+
+              <form.Field name="timezone">
+                <template #default="{ field }">
+                  <Popover :open="isTZOpen" @update:open="val => (isTZOpen = val)">
                     <PopoverTrigger as-child>
                       <Button
-                        id="end-date"
-                        variant="outline"
-                        :class="
-                          cn(
-                            'group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]',
-                            !form.getFieldValue('endDate') && 'text-muted-foreground'
-                          )
-                        "
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        class="min-w-0 max-w-full gap-1.5 px-2 font-normal text-muted-foreground"
+                        :aria-label="`Timezone: ${getTZDisplayName(String(field.state.value ?? ''))}`"
                       >
-                        <span :class="cn('truncate', !form.getFieldValue('endDate') && 'text-muted-foreground')">
-                          {{
-                            form.getFieldValue("endDate") ? format(form.getFieldValue("endDate"), "PPP") : "Pick a date"
-                          }}
-                        </span>
-                        <CalendarIcon
-                          :size="16"
-                          class="text-muted-foreground/80 shrink-0"
-                          aria-hidden="true"
-                        />
+                        <Globe :size="14" aria-hidden="true" />
+                        <span class="truncate">{{ getTZDisplayName(String(field.state.value ?? "")) }}</span>
+                        <ChevronsUpDown class="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent class="w-auto p-2" align="start">
-                      <Calendar
-                        mode="single"
-                        :min-value="convertToDateValue(startDateValue ?? new Date(), getLocalTimeZone())"
-                        @update:model-value="
-                          date => {
-                            if (date) {
-                              const newDate = toDate(date)
-                              endDateValue = newDate
-                              field.handleChange(newDate)
-                              endDateOpen = false
-                            }
-                          }
-                        "
-                      />
+                    <PopoverContent class="w-[min(22rem,calc(100vw-2rem))] p-0" side="bottom" align="end">
+                      <Command>
+                        <CommandInput placeholder="Search timezones…" />
+                        <CommandList class="max-h-64">
+                          <CommandEmpty>No timezone found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              v-for="tz in commonTimezones"
+                              :key="tz.timezone"
+                              :value="`${tz.label} ${tz.timezone} ${tz.offset}`"
+                              class="flex cursor-pointer items-center justify-between gap-2"
+                              @select="
+                                () => {
+                                  field.handleChange(tz.timezone)
+                                  isTZOpen = false
+                                }
+                              "
+                            >
+                              <span class="truncate">{{ tz.label }}</span>
+                              <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ tz.offset }}</span>
+                              <Check
+                                :class="cn('size-4 shrink-0', tz.timezone === form.getFieldValue('timezone') ? 'opacity-100' : 'opacity-0')"
+                              />
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
                     </PopoverContent>
                   </Popover>
-                  <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                    {{ field.state.meta.errors.join(", ") }}
-                  </p>
-                </div>
-              </template>
-            </form.Field>
+                </template>
+              </form.Field>
+            </div>
+          </fieldset>
 
-            <form.Field v-if="!isAllDay" name="endTime">
-              <template #default="{ field }">
-                <div class="min-w-28 *:not-first:mt-1.5">
-                  <Label :for="field.name">End Time</Label>
-                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem v-for="option in timeOptions" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                    {{ field.state.meta.errors.join(", ") }}
-                  </p>
-                </div>
-              </template>
-            </form.Field>
-          </div>
-
-          <form.Field name="allDay">
+          <form.Field name="location" :validators="{ onChange: locationSchema }">
             <template #default="{ field }">
-              <div class="flex items-center gap-2">
-                <Checkbox
-                  :id="field.name"
-                  :name="field.name"
-                  :model-value="field.state.value"
-                  @blur="field.handleBlur"
-                  @update:model-value="
-                    val => {
-                      isAllDay = val === true
-                      field.handleChange(val === true)
-                    }
-                  "
-                />
-                <Label :for="field.name" class="font-normal">All Day Event</Label>
-              </div>
-            </template>
-          </form.Field>
-
-          <form.Field name="location">
-            <template #default="{ field }">
-              <div class="*:not-first:mt-1.5">
-                <Label :for="field.name" class="flex items-center gap-2">
-                  <MapPin :size="14" class="text-muted-foreground" />
-                  Location
-                </Label>
-                <div class="relative">
+              <div :class="fieldClass">
+                <Label :for="field.name">Location</Label>
+                <div class="relative min-w-0">
+                  <MapPin :size="16" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                   <Input
                     :id="field.name"
                     :name="field.name"
                     :model-value="field.state.value"
-                    placeholder="Add event location"
+                    placeholder="Add a place or link"
                     class="pl-9"
                     @blur="field.handleBlur"
                     @update:model-value="(v) => field.handleChange(String(v))"
                   />
-                  <MapPin
-                    :size="16"
-                    class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"
-                  />
                 </div>
-                <!-- Location preview -->
-                <div
-                  v-if="field.state.value?.trim()"
-                  class="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-md p-2"
-                >
-                  <MapPin :size="14" class="shrink-0" />
-                  <span class="truncate">{{ field.state.value }}</span>
-                </div>
-                <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                  {{ field.state.meta.errors.join(", ") }}
+                <p v-if="!field.state.meta.isValid" class="text-xs text-destructive">
+                  {{ fieldErrors(field.state.meta.errors) }}
                 </p>
               </div>
             </template>
           </form.Field>
 
-          <form.Field name="color">
+          <form.Field name="description" :validators="{ onChange: descriptionSchema }">
             <template #default="{ field }">
-              <fieldset class="space-y-4">
-                <legend class="text-foreground text-sm leading-none font-medium">Color</legend>
-                <RadioGroup
+              <div :class="fieldClass">
+                <Label :for="field.name">Notes</Label>
+                <Textarea
                   :id="field.name"
-                  class="flex gap-1.5"
                   :name="field.name"
-                  :default-value="colorOptions[0]?.value"
                   :model-value="field.state.value"
+                  placeholder="Agenda, links, anything useful"
                   @blur="field.handleBlur"
-                  @update:model-value="field.handleChange"
-                >
-                  <RadioGroupItem
-                    v-for="colorOption in colorOptions"
-                    :id="`color-${colorOption.value}`"
-                    :key="colorOption.value"
-                    :value="colorOption.value"
-                    :aria-label="colorOption.label"
-                    :class="cn('size-6 shadow-none', colorOption.bgClass, colorOption.borderClass)"
-                  />
-                </RadioGroup>
-                <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                  {{ field.state.meta.errors.join(", ") }}
-                </p>
-              </fieldset>
-            </template>
-          </form.Field>
-
-          <form.Field name="status">
-            <template #default="{ field }">
-              <div class="*:not-first:mt-1.5">
-                <Label :for="field.name">Status</Label>
-                <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="tentative">Tentative</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                  {{ field.state.meta.errors.join(", ") }}
+                  @update:model-value="(v) => field.handleChange(String(v))"
+                />
+                <p v-if="!field.state.meta.isValid" class="text-xs text-destructive">
+                  {{ fieldErrors(field.state.meta.errors) }}
                 </p>
               </div>
             </template>
           </form.Field>
 
-          <form.Field name="timezone">
-            <template #default="{ field }">
-              <div class="*:not-first:mt-1.5">
-                <Label :for="field.name" class="flex items-center gap-2">
-                  <Globe :size="14" class="text-muted-foreground" />
-                  Timezone
-                </Label>
-                <Popover :open="isTZOpen">
-                  <PopoverTrigger as-child>
-                    <Button
-                      @click.stop="isTZOpen = !isTZOpen"
-                      variant="outline"
-                      class="cursor-pointer justify-between w-full"
+          <div class="grid min-w-0 gap-4 sm:grid-cols-2">
+            <form.Field name="color">
+              <template #default="{ field }">
+                <fieldset class="grid min-w-0 gap-1.5">
+                  <legend class="mb-1.5 text-sm font-medium">Colour</legend>
+                  <RadioGroup
+                    :id="field.name"
+                    class="flex flex-wrap gap-0.5"
+                    :name="field.name"
+                    :model-value="field.state.value"
+                    @blur="field.handleBlur"
+                    @update:model-value="(v: unknown) => field.handleChange(v as never)"
+                  >
+                    <!-- Each swatch sits in a full-size touch target. -->
+                    <label
+                      v-for="colorOption in colorOptions"
+                      :key="colorOption.value"
+                      :for="`color-${colorOption.value}`"
+                      class="grid size-9 cursor-pointer place-items-center rounded-full"
                     >
-                      {{ getTZDisplayName(field.state.value) ?? "Select Timezone" }}
+                      <RadioGroupItem
+                        :id="`color-${colorOption.value}`"
+                        :value="colorOption.value"
+                        :aria-label="colorOption.label"
+                        :class="cn('size-6 shadow-none', colorOption.bgClass, colorOption.borderClass)"
+                      />
+                    </label>
+                  </RadioGroup>
+                </fieldset>
+              </template>
+            </form.Field>
 
-                      <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent class="w-auto p-0" side="bottom" align="start">
-                    <Command>
-                      <CommandInput placeholder="Filter timezones..." />
-                      <CommandList>
-                        <CommandEmpty>No timezone found.</CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                            v-for="tz in commonTimezones"
-                            :key="tz.timezone"
-                            :value="tz.timezone"
-                            class="cursor-pointer flex justify-between items-center"
-                            @select="
-                              () => {
-                                field.handleChange(tz.timezone)
-                                isTZOpen = false
-                              }
-                            "
-                          >
-                            {{ tz.label }} ({{ tz.offset }})
-                            <Check
-                              :class="
-                                cn(
-                                  'ml-auto h-4 w-4',
-                                  tz.timezone === form.getFieldValue('timezone') ? 'opacity-100' : 'opacity-0'
-                                )
-                              "
-                            />
-                          </CommandItem>
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <p v-if="field.state.meta.isTouched && !field.state.meta.isValid" class="text-xs text-destructive">
-                  {{ field.state.meta.errors.join(", ") }}
-                </p>
-              </div>
-            </template>
-          </form.Field>
+            <form.Field name="status">
+              <template #default="{ field }">
+                <div :class="fieldClass">
+                  <Label :for="field.name">Status</Label>
+                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
+                    <SelectTrigger :id="field.name" class="w-full min-w-0">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="tentative">Tentative</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </template>
+            </form.Field>
+          </div>
 
           <!-- Recurring Event Fields (feature-flagged) -->
           <form.Field v-if="recurringEnabled" name="isRecurring">
             <template #default="{ field }">
-              <div class="flex items-center gap-2">
+              <div class="flex min-h-11 items-center gap-2">
                 <Checkbox
                   :id="field.name"
                   :name="field.name"
@@ -835,86 +821,84 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                     }
                   "
                 />
-                <Label :for="field.name" class="font-normal flex items-center gap-2">
-                  <Repeat :size="14" class="text-muted-foreground" />
-                  Recurring Event
+                <Label :for="field.name" class="flex items-center gap-2 font-normal">
+                  <Repeat :size="14" class="text-muted-foreground" aria-hidden="true" />
+                  Repeats
                 </Label>
               </div>
             </template>
           </form.Field>
 
           <!-- Recurring Pattern Fields (shown only when enabled and isRecurring is true) -->
-          <div v-if="recurringEnabled && isRecurring" class="space-y-4 p-4 bg-muted/30 rounded-md">
-            <h4 class="text-sm font-medium text-foreground">Recurrence Pattern</h4>
+          <fieldset v-if="recurringEnabled && isRecurring" class="grid min-w-0 gap-4 rounded-lg border border-border bg-muted/40 p-3 sm:p-4">
+            <legend class="sr-only">Recurrence</legend>
 
-            <form.Field name="recurringPattern.type">
-              <template #default="{ field }">
-                <div class="*:not-first:mt-1.5">
-                  <Label :for="field.name">Repeat</Label>
-                  <Select :name="field.name" :model-value="field.state.value" @update:model-value="field.handleChange">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select frequency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </template>
-            </form.Field>
-
-            <div class="flex gap-4">
-              <form.Field name="recurringPattern.interval">
+            <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <form.Field name="recurringPattern.type">
                 <template #default="{ field }">
-                  <div class="flex-1 *:not-first:mt-1.5">
-                    <Label :for="field.name">Every</Label>
-                    <Input
-                      :id="field.name"
-                      :name="field.name"
-                      type="number"
-                      min="1"
-                      max="365"
-                      :model-value="field.state.value"
-                      placeholder="1"
-                      @blur="field.handleBlur"
-                      @update:model-value="(v) => field.handleChange(Number(v))"
-                    />
+                  <div :class="fieldClass">
+                    <Label :for="field.name">Repeat</Label>
+                    <Select :name="field.name" :model-value="field.state.value" @update:model-value="(v: unknown) => field.handleChange(v as never)">
+                      <SelectTrigger :id="field.name" class="w-full min-w-0">
+                        <SelectValue placeholder="Frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </template>
               </form.Field>
 
-              <div class="flex-1 flex items-end">
-                <span class="text-sm text-muted-foreground pb-2">
-                  {{ form.getFieldValue("recurringPattern.type") || "day(s)"
-                  }}{{ form.getFieldValue("recurringPattern.interval") > 1 ? "s" : "" }}
-                </span>
-              </div>
+              <form.Field name="recurringPattern.interval">
+                <template #default="{ field }">
+                  <div :class="fieldClass">
+                    <Label :for="field.name">Every</Label>
+                    <div class="flex min-w-0 items-center gap-2">
+                      <Input
+                        :id="field.name"
+                        :name="field.name"
+                        type="number"
+                        min="1"
+                        max="365"
+                        inputmode="numeric"
+                        class="w-16 shrink-0 px-2 text-center"
+                        :model-value="field.state.value"
+                        @blur="field.handleBlur"
+                        @update:model-value="(v) => field.handleChange(Number(v))"
+                      />
+                      <span class="truncate text-sm text-muted-foreground">
+                        {{ ({ daily: "day", weekly: "week", monthly: "month", yearly: "year" } as Record<string, string>)[form.getFieldValue("recurringPattern.type") ?? "daily"] ?? "day"
+                        }}{{ (form.getFieldValue("recurringPattern.interval") ?? 1) > 1 ? "s" : "" }}
+                      </span>
+                    </div>
+                  </div>
+                </template>
+              </form.Field>
             </div>
 
             <!-- Weekly days selection -->
-            <form.Field
-              v-if="form.getFieldValue('recurringPattern.type') === 'weekly'"
-              name="recurringPattern.daysOfWeek"
-            >
+            <form.Field v-if="form.getFieldValue('recurringPattern.type') === 'weekly'" name="recurringPattern.daysOfWeek">
               <template #default="{ field }">
-                <div class="*:not-first:mt-1.5">
-                  <Label :for="field.name">Days of the week</Label>
+                <div :class="fieldClass">
+                  <Label>On</Label>
                   <ToggleGroup
                     :model-value="field.state.value"
-                    @update:model-value="field.handleChange"
                     type="multiple"
                     variant="outline"
                     size="sm"
+                    class="grid w-full grid-cols-7"
+                    @update:model-value="(v: unknown) => field.handleChange(v as never)"
                   >
                     <ToggleGroupItem
-                      v-for="(day, index) in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']"
-                      :key="day"
+                      v-for="(day, index) in ['S', 'M', 'T', 'W', 'T', 'F', 'S']"
+                      :key="index"
                       :value="index"
-                      :aria-label="`Toggle ${day}`"
-                      class="w-12 h-8 p-0 cursor-pointer"
+                      :aria-label="['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][index]"
+                      class="h-9 min-w-0 cursor-pointer px-0"
                     >
                       {{ day }}
                     </ToggleGroupItem>
@@ -924,24 +908,24 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
             </form.Field>
 
             <!-- End condition -->
-            <div class="space-y-2">
-              <Label class="text-sm font-medium">End recurrence</Label>
+            <div class="grid min-w-0 gap-2">
+              <Label>Ends</Label>
               <RadioGroup
                 :model-value="recurringEndType"
+                class="grid gap-2"
                 @update:model-value="
                   value => {
                     recurringEndType = String(value)
                     form.setFieldValue('recurringEndType', String(value))
                   }
                 "
-                class="space-y-2"
               >
-                <div class="flex items-center space-x-2">
-                  <RadioGroupItem value="never" id="end-never" />
+                <div class="flex min-h-9 items-center gap-2">
+                  <RadioGroupItem id="end-never" value="never" />
                   <Label for="end-never" class="font-normal">Never</Label>
                 </div>
-                <div class="flex items-center space-x-2">
-                  <RadioGroupItem value="after" id="end-after" />
+                <div class="flex min-h-9 flex-wrap items-center gap-2">
+                  <RadioGroupItem id="end-after" value="after" />
                   <Label for="end-after" class="font-normal">After</Label>
                   <form.Field name="recurringPattern.count">
                     <template #default="{ field }">
@@ -951,32 +935,35 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                         type="number"
                         min="1"
                         max="999"
+                        inputmode="numeric"
                         :model-value="field.state.value"
                         :disabled="recurringEndType !== 'after'"
                         placeholder="10"
-                        class="w-20"
+                        class="w-20 px-2 text-center"
+                        aria-label="Number of occurrences"
                         @blur="field.handleBlur"
                         @update:model-value="(v) => field.handleChange(Number(v))"
                       />
                     </template>
                   </form.Field>
-                  <span class="text-sm text-muted-foreground">occurrences</span>
+                  <span class="text-sm text-muted-foreground">times</span>
                 </div>
-                <div class="flex items-center space-x-2">
-                  <RadioGroupItem value="on" id="end-on" />
+                <div class="flex min-h-9 flex-wrap items-center gap-2">
+                  <RadioGroupItem id="end-on" value="on" />
                   <Label for="end-on" class="font-normal">On</Label>
                   <form.Field name="recurringPattern.endDate">
                     <template #default="{ field }">
                       <Popover>
                         <PopoverTrigger as-child>
                           <Button
+                            type="button"
                             variant="outline"
                             size="sm"
                             :disabled="recurringEndType !== 'on'"
-                            class="w-32 justify-start text-left font-normal"
+                            class="justify-start font-normal"
                           >
-                            <CalendarIcon :size="14" class="mr-2" />
-                            {{ field.state.value ? format(field.state.value, "MMM dd, yyyy") : "Pick date" }}
+                            <CalendarIcon :size="14" aria-hidden="true" />
+                            {{ field.state.value ? format(field.state.value, "MMM d, yyyy") : "Pick a date" }}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent class="w-auto p-2">
@@ -1000,29 +987,34 @@ const formatDateTimeLocal = (date: Date | string | undefined) => {
                 </div>
               </RadioGroup>
             </div>
-          </div>
+          </fieldset>
         </div>
 
-        <DialogFooter>
+        <!-- Actions stay reachable: pinned to the bottom of the sheet on phones. -->
+        <!-- A plain container (not DialogFooter) so host dialog styles can't shift it. -->
+        <div
+          class="grid shrink-0 grid-cols-2 gap-2 border-t bg-popover px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:px-6 sm:pb-6"
+        >
           <form.Subscribe>
             <template #default="{ canSubmit, isSubmitting }">
-              <Button type="button" variant="outline" @click="closePopup">Cancel</Button>
-              <Button type="submit" :disabled="!canSubmit">
-                {{ isSubmitting ? "Saving..." : mode === "add" ? "Add Event" : "Save Changes" }}
-              </Button>
               <Button
                 v-if="mode === 'edit'"
                 type="button"
-                variant="destructive"
-                class="ml-auto"
-                :disabled="!canSubmit"
+                :variant="confirmingDelete ? 'destructive' : 'ghost'"
+                class="col-span-2 sm:col-span-1 sm:mr-auto"
+                :class="!confirmingDelete && 'text-destructive'"
+                :disabled="isSubmitting"
                 @click="handleDelete"
               >
-                Delete
+                {{ confirmingDelete ? "Confirm delete" : "Delete" }}
+              </Button>
+              <Button type="button" variant="outline" @click="closePopup">Cancel</Button>
+              <Button type="submit" :disabled="!canSubmit || isSubmitting" :aria-busy="isSubmitting || undefined">
+                {{ isSubmitting ? "Saving…" : mode === "add" ? "Add event" : "Save" }}
               </Button>
             </template>
           </form.Subscribe>
-        </DialogFooter>
+        </div>
       </form>
     </DialogContent>
   </Dialog>

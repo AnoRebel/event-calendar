@@ -1,5 +1,5 @@
 import { computed, type Ref } from 'vue'
-import { isPast, isToday, endOfDay } from 'date-fns'
+import { isPast, endOfDay } from 'date-fns'
 import type { CalendarEvent, EventStatus } from '../types'
 
 // Accepts any readable ref of events (a `computed` in the views, a plain `ref`
@@ -15,7 +15,6 @@ export function useEventStatus(events: Readonly<Ref<CalendarEvent[]>>) {
 
     // Auto-determine if event is past
     const eventEnd = new Date(event.endDate)
-    const now = new Date()
     
     if (event.allDay) {
       // For all-day events, consider them past after the day ends

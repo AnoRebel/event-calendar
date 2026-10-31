@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline · Event Calendar</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #eef0f5;
+        --panel: #f5f6fa;
+        --ink: #11131a;
+        --muted: #4a5163;
+        --line: #d7dbe6;
+        --accent: #4f46e5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0d0f15;
+          --panel: #151822;
+          --ink: #eef0f6;
+          --muted: #a7adbd;
+          --line: #2a2f3d;
+          --accent: #8b85ff;
+        }
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        box-sizing: border-box;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main {
+        max-width: 26rem;
+        width: 100%;
+        text-align: center;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 2rem 1.5rem;
+      }
+      h1 {
+        font-size: 1.375rem;
+        margin: 1rem 0 0.5rem;
+      }
+      p {
+        margin: 0 0 1.5rem;
+        color: var(--muted);
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        border: 0;
+        border-radius: 999px;
+        padding: 0.7rem 1.5rem;
+        min-height: 44px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icon.svg" width="56" height="56" alt="" />
+      <h1>You're offline</h1>
+      <p>Event Calendar needs a connection to load your events. Your changes are safe on the server.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+    <script>
+      addEventListener("online", () => location.reload())
+    </script>
+  </body>
+</html>

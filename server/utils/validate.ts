@@ -1,24 +1,15 @@
-import * as v from "valibot"
-import type { H3Event } from "h3"
+import type * as v from "valibot"
+import type { RequestEvent } from "nuxt/server"
+import { readValidatedBody } from "nuxt/server"
 
-// Validate an H3 request body against a valibot schema, throwing a 400 with the
-// flattened issues on failure. Returns the parsed (and stripped) output.
-export async function readValidated<TSchema extends v.GenericSchema>(
-  event: H3Event,
+// Read the request body validated against a valibot schema (valibot implements
+// Standard Schema, which `nuxt/server` validates natively). A failure is a 400
+// whose `message` is the first issue, so clients can show it directly.
+export function readValidated<TSchema extends v.GenericSchema>(
+  event: RequestEvent,
   schema: TSchema,
 ): Promise<v.InferOutput<TSchema>> {
-  const body = await readBody(event)
-  const result = v.safeParse(schema, body)
-  if (!result.success) {
-    const errors = result.issues.map(i => ({
-      field: i.path?.map(p => p.key).join(".") || "",
-      message: i.message,
-    }))
-    throw createError({
-      statusCode: 400,
-      statusMessage: errors[0]?.message || "Invalid request",
-      data: { errors },
-    })
-  }
-  return result.output
+  return readValidatedBody(event, schema, {
+    onError: ({ issues }) => ({ status: 400, message: issues[0]?.message || "Invalid request" }),
+  }) as Promise<v.InferOutput<TSchema>>
 }

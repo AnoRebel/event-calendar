@@ -1,4 +1,4 @@
-import { computed, ref, type ComputedRef } from 'vue'
+import { computed, type ComputedRef } from 'vue'
 import { 
   addDays, 
   addWeeks, 
@@ -6,13 +6,10 @@ import {
   addYears, 
   isBefore, 
   isAfter, 
-  startOfDay,
-  endOfDay,
   setDay,
   getDay,
   format
 } from 'date-fns'
-import { v4 as uuidv4 } from 'uuid'
 import type { CalendarEvent, RecurringPattern } from '../types'
 
 export function useRecurringEvents(events: ComputedRef<CalendarEvent[]>) {
@@ -83,15 +80,15 @@ export function useRecurringEvents(events: ComputedRef<CalendarEvent[]>) {
         if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
           // Find next day of week
           const currentDay = getDay(currentDate)
-          const nextDay = pattern.daysOfWeek.find(day => day > currentDay) ?? 
-                         pattern.daysOfWeek[0]
+          const firstDay = pattern.daysOfWeek[0]!
+          const nextDay = pattern.daysOfWeek.find(day => day > currentDay) ?? firstDay
           
           if (nextDay > currentDay) {
             return setDay(currentDate, nextDay)
           } else {
             // Move to next week and set to first day
             const nextWeek = addWeeks(currentDate, pattern.interval)
-            return setDay(nextWeek, pattern.daysOfWeek[0])
+            return setDay(nextWeek, firstDay)
           }
         } else {
           return addWeeks(currentDate, pattern.interval)
@@ -109,7 +106,7 @@ export function useRecurringEvents(events: ComputedRef<CalendarEvent[]>) {
       case 'yearly':
         if (pattern.monthOfYear !== undefined) {
           const nextYear = addYears(currentDate, pattern.interval)
-          nextYear.setMonth(pattern.monthOfYear)
+          nextYear.setMonth(pattern.monthOfYear - 1) // monthOfYear is 1–12
           if (pattern.dayOfMonth) {
             nextYear.setDate(pattern.dayOfMonth)
           }
@@ -192,8 +189,8 @@ export function useRecurringEvents(events: ComputedRef<CalendarEvent[]>) {
     }
     
     if (pattern.type === 'yearly' && pattern.monthOfYear !== undefined) {
-      if (pattern.monthOfYear < 0 || pattern.monthOfYear > 11) {
-        errors.push('Month must be between 0 and 11')
+      if (pattern.monthOfYear < 1 || pattern.monthOfYear > 12) {
+        errors.push('Month must be between 1 and 12')
       }
     }
     
@@ -204,36 +201,29 @@ export function useRecurringEvents(events: ComputedRef<CalendarEvent[]>) {
     return errors
   }
 
-  // Get human-readable description of pattern
+  // Human-readable description, e.g. "Every 2 weeks on Mon, Wed" or "Yearly on March 14".
   const getPatternDescription = (pattern: RecurringPattern): string => {
-    const interval = pattern.interval > 1 ? ` every ${pattern.interval}` : ''
-    
-    const plural = pattern.interval > 1
+    const units = { daily: "day", weekly: "week", monthly: "month", yearly: "year" } as const
+    const single = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" } as const
+    const n = Math.max(1, pattern.interval || 1)
+    const base = n === 1 ? single[pattern.type] : `Every ${n} ${units[pattern.type]}s`
 
     switch (pattern.type) {
-      case 'daily':
-        return `Daily${plural ? interval + ' days' : ''}`
-
-      case 'weekly':
-        if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
-          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-          const selectedDays = pattern.daysOfWeek.map(d => dayNames[d]).join(', ')
-          return `Weekly on ${selectedDays}${interval}`
-        }
-        return `Weekly${plural ? interval + ' weeks' : ''}`
-
-      case 'monthly':
-        const dayStr = pattern.dayOfMonth ? ` on day ${pattern.dayOfMonth}` : ''
-        return `Monthly${dayStr}${plural ? interval + ' months' : ''}`
-
-      case 'yearly':
-        const monthStr = pattern.monthOfYear !== undefined ?
-          ` in ${format(new Date(2000, pattern.monthOfYear), 'MMMM')}` : ''
-        const yearDayStr = pattern.dayOfMonth ? ` ${pattern.dayOfMonth}` : ''
-        return `Yearly${monthStr}${yearDayStr}${plural ? interval + ' years' : ''}`
-      
+      case "weekly": {
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        const days = (pattern.daysOfWeek ?? []).map(d => dayNames[d]).filter(Boolean)
+        return days.length ? `${base} on ${days.join(", ")}` : base
+      }
+      case "monthly":
+        return pattern.dayOfMonth ? `${base} on day ${pattern.dayOfMonth}` : base
+      case "yearly": {
+        // monthOfYear is 1–12 (as the event dialog stores it).
+        const month = pattern.monthOfYear ? format(new Date(2000, pattern.monthOfYear - 1, 1), "MMMM") : ""
+        const day = pattern.dayOfMonth ? ` ${pattern.dayOfMonth}` : ""
+        return month ? `${base} on ${month}${day}` : base
+      }
       default:
-        return 'Custom'
+        return base
     }
   }
 

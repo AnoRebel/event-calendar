@@ -3,16 +3,8 @@ import { mount, config } from '@vue/test-utils'
 import EventCalendar from '../EventCalendar.vue'
 import type { CalendarEvent } from '../types'
 
-// DnDProvider/DragPreview are globally registered by the @vue-dnd-kit/nuxt module
-// in the app, but isolated mounts have no such registration — stub them so any
-// descendant referencing them renders.
 config.global.stubs = {
   ...(config.global.stubs as Record<string, unknown>),
-  DnDProvider: { template: '<div><slot /></div>' },
-  DragPreview: { template: '<div />' },
-  // DarkModeToggle depends on the Nuxt auto-imported `useDarkMode`, which the
-  // vitest environment does not provide — stub it out for these mounts.
-  DarkModeToggle: { template: '<button />' },
   // EventModal calls Nuxt auto-imported composables (useFeatureFlags) that the
   // vitest env doesn't provide, and these tests drive CRUD through EventCalendar's
   // own exposed handlers rather than the modal UI — stub it.
@@ -47,22 +39,6 @@ vi.mock('../composables/useColorManager', () => ({
     getColorStats: vi.fn(() => ({}))
   })
 }))
-
-vi.mock('../composables/useDragAndDrop', () => {
-  const { ref, computed } = require('vue')
-  return {
-    useDragAndDropSystem: () => ({
-      globalDragState: { value: { isDragging: false, draggedEvent: null, validDropZones: [], currentDropZone: null, dragPreview: null } },
-      formatEventDuration: vi.fn(() => '1h'),
-      calculateEventHeight: vi.fn(() => 60),
-      createDragConfig: vi.fn(() => ({ zoneId: 'z', zoneType: 'timed', dateKey: '2024-01-01', handleDrop: vi.fn(), disabled: false })),
-      // The views destructure `.elementRef` / `.isOver` off these return values
-      // during render, so the mocks must return the real shapes.
-      createDroppableZone: vi.fn(() => ({ elementRef: ref(null), isOver: computed(() => false) })),
-      createDraggableEvent: vi.fn(() => ({ elementRef: ref(null), isDragging: ref(false), handleDragStart: vi.fn(), handleDragEnd: vi.fn() }))
-    })
-  }
-})
 
 vi.mock('../composables/useEventStatus', () => ({
   useEventStatus: () => ({
@@ -165,7 +141,7 @@ describe('EventCalendar', () => {
     
     // Simulate event update
     await wrapper.vm.handleModalSubmit({
-      ...mockEvents[0],
+      ...mockEvents[0]!,
       title: 'Updated Event',
       status: 'tentative'
     }, 'edit')
@@ -239,7 +215,7 @@ describe('EventCalendar', () => {
   })
 
   it('handles multi-day events', () => {
-    const wrapper = mount(EventCalendar, {
+    mount(EventCalendar, {
       props: {
         events: mockEvents
       }

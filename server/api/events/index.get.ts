@@ -1,6 +1,7 @@
 import { and, eq, gte, lte } from "drizzle-orm"
 import { events } from "../../db/schema"
 import { rowToDto } from "../../utils/eventMapper"
+import { defineEventHandler, getQuery } from "nuxt/server"
 
 // GET /api/events?start=&end=&page=&limit=
 // Returns a paginated envelope matching useEventAPI's PaginatedResponse shape.

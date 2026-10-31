@@ -1,5 +1,6 @@
 import type { Peer } from "crossws"
 import { registerBroadcaster, type EventChange } from "../utils/broadcast"
+import { defineWebSocketHandler } from "h3"
 
 // Per-user topic so a peer only receives changes to events it's authorized to
 // see (listing is owner-scoped). Events carry their ownerId; deletes carry the
@@ -51,19 +52,9 @@ export default defineWebSocketHandler({
 
     // Resolve identity from the session cookie in the open hook — NOT from
     // context returned by upgrade (nuxt#33829: it isn't reliably propagated).
-    //
-    // getUserSession expects an H3Event; a crossws peer only exposes the upgrade
-    // Request. Build a minimal event whose cookie header getUserSession/h3 can
-    // read (h3 reads event.node.req.headers.cookie).
+    // nuxt-auth-utils reads the cookie from the peer's upgrade request directly.
     try {
-      const cookie = peer.request?.headers?.get("cookie") ?? ""
-      const mockEvent = {
-        node: { req: { headers: { cookie } }, res: { getHeader() {}, setHeader() {} } },
-        context: {},
-        headers: peer.request?.headers,
-      } as unknown as Parameters<typeof getUserSession>[0]
-
-      const session = await getUserSession(mockEvent)
+      const session = await getUserSession(peer as unknown as Parameters<typeof getUserSession>[0])
       const userId = session?.user?.id
       if (!userId) {
         // Unauthenticated sockets are not subscribed to anything.

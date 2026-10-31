@@ -1,146 +1,47 @@
-import { ref, readonly, onMounted } from "vue"
+import { onMounted, readonly, ref } from "vue"
+import { toast } from "vue-sonner"
 
-interface ServiceWorkerState {
-  isSupported: boolean
-  isRegistered: boolean
-  isUpdating: boolean
-  hasUpdate: boolean
-  error: string | null
-}
-
-/**
- * Service Worker registration and management
- */
+// Registers public/sw.js (production builds only) and offers a reload when a new
+// version has been installed. See public/sw.js for what is and isn't cached.
 export function useServiceWorker() {
-  const state = ref<ServiceWorkerState>({
-    isSupported: false,
-    isRegistered: false,
-    isUpdating: false,
-    hasUpdate: false,
-    error: null,
-  })
-
   const registration = ref<ServiceWorkerRegistration | null>(null)
+  const updateAvailable = ref(false)
 
-  const register = async (): Promise<void> => {
-    // TODO: Get the service worker to work properly
-    return
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
-      state.value.error = "Service Worker not supported"
-      return
-    }
+  const promptUpdate = (worker: ServiceWorker) => {
+    updateAvailable.value = true
+    toast("A new version is available", {
+      description: "Reload to get the latest Event Calendar.",
+      duration: Number.POSITIVE_INFINITY,
+      action: {
+        label: "Reload",
+        onClick: () => worker.postMessage({ type: "SKIP_WAITING" }),
+      },
+    })
+  }
 
-    state.value.isSupported = true
-
+  onMounted(async () => {
+    if (import.meta.dev || !("serviceWorker" in navigator)) return
     try {
-      const reg = await navigator.serviceWorker.register("/sw.js", {
-        scope: "/",
-      })
-
+      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" })
       registration.value = reg
-      state.value.isRegistered = true
-
-      // Listen for updates
+      if (reg.waiting && navigator.serviceWorker.controller) promptUpdate(reg.waiting)
       reg.addEventListener("updatefound", () => {
-        const newWorker = reg.installing
-        if (!newWorker) return
-
-        state.value.isUpdating = true
-
-        newWorker.addEventListener("statechange", () => {
-          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-            state.value.hasUpdate = true
-            state.value.isUpdating = false
-          }
+        const worker = reg.installing
+        worker?.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) promptUpdate(worker)
         })
       })
-
-      // Listen for messages from service worker
-      navigator.serviceWorker.addEventListener("message", event => {
-        handleServiceWorkerMessage(event.data)
+      // The new worker took over: load the page it serves.
+      let reloading = false
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloading) return
+        reloading = true
+        window.location.reload()
       })
-
-      console.log("Service Worker registered successfully")
     } catch (error) {
-      const message = error instanceof Error ? (error as Error).message : "Registration failed"
-      state.value.error = message
-      console.error("Service Worker registration failed:", error)
+      console.warn("Service worker registration failed:", error)
     }
-  }
-
-  const update = async (): Promise<void> => {
-    if (!registration.value) return
-
-    try {
-      await registration.value.update()
-    } catch (error) {
-      console.error("Service Worker update failed:", error)
-    }
-  }
-
-  const skipWaiting = (): void => {
-    if (!registration.value?.waiting) return
-
-    registration.value.waiting.postMessage({ type: "SKIP_WAITING" })
-    window.location.reload()
-  }
-
-  const handleServiceWorkerMessage = (data: any): void => {
-    switch (data.type) {
-      case "SYNC_SUCCESS":
-        console.log("Background sync successful:", data.eventId)
-        break
-      case "CACHED_EVENTS":
-        console.log("Cached events received:", data.data)
-        break
-      default:
-        console.log("Service Worker message:", data)
-    }
-  }
-
-  const sendMessage = (message: any): void => {
-    if (!registration.value?.active) return
-
-    registration.value.active.postMessage(message)
-  }
-
-  const getCachedEvents = (): Promise<any[]> => {
-    return new Promise(resolve => {
-      if (!registration.value?.active) {
-        resolve([])
-        return
-      }
-
-      const channel = new MessageChannel()
-      channel.port1.onmessage = event => {
-        if (event.data.type === "CACHED_EVENTS") {
-          resolve(event.data.data)
-        }
-      }
-
-      registration.value.active.postMessage({ type: "GET_CACHED_EVENTS" }, [channel.port2])
-    })
-  }
-
-  const cacheEvent = (eventData: any): void => {
-    sendMessage({
-      type: "CACHE_EVENT",
-      data: eventData,
-    })
-  }
-
-  onMounted(() => {
-    register()
   })
 
-  return {
-    state: readonly(state),
-    registration: readonly(registration),
-    register,
-    update,
-    skipWaiting,
-    sendMessage,
-    getCachedEvents,
-    cacheEvent,
-  }
+  return { registration: readonly(registration), updateAvailable: readonly(updateAvailable) }
 }

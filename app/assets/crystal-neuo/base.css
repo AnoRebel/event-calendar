@@ -1,0 +1,167 @@
+/* Crystal Neuo v4.0.0 (056c0ef) — vendored by scripts/sync-crystal-neuo.ts. Do not edit. */
+/* Crystal Neuo base layer — applies tokens to document defaults.
+   Import AFTER tokens.css. Framework-agnostic, no component classes here
+   except the two public utilities at the end. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  color-scheme: light;
+}
+:where([data-theme="dark"], [data-theme="high-contrast"]) {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-app);
+  color: var(--content-primary);
+  /* The platform's interface face: the material's text face on the web, the
+     system face on iOS, Android, Windows, and macOS. */
+  font-family: var(--font-family-ui);
+  font-size: var(--type-body-base);
+  line-height: var(--leading-normal);
+  font-weight: var(--weight-regular);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition:
+    background-color var(--motion-duration-base) var(--motion-easing-standard),
+    color var(--motion-duration-base) var(--motion-easing-standard);
+}
+
+/* A nested axis attribute recomputes the tokens below it, but inherited
+   properties were already computed from the page's tokens at <body>.
+   Re-resolve them where a subtree changes theme, material, or platform, so
+   inherited text takes the subtree's ink and UI face. A nested theme also
+   paints its own app surface, or dark text could land on a light page.
+   Zero specificity: any component rule still wins. */
+:where(body [data-theme], body [data-material], body [data-platform]) {
+  color: var(--content-primary);
+  font-family: var(--font-family-ui);
+}
+:where(body [data-theme]) {
+  background-color: var(--surface-app);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-family-display);
+  line-height: var(--leading-tight);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--content-primary);
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--type-h1);
+}
+h2 {
+  font-size: var(--type-h2);
+}
+h3 {
+  font-size: var(--type-h3);
+}
+h4 {
+  font-size: var(--type-h4);
+}
+h5 {
+  font-size: var(--type-h5);
+}
+h6 {
+  font-size: var(--type-h6);
+}
+
+p {
+  margin: 0 0 var(--space-4);
+  text-wrap: pretty;
+}
+
+/* Underlined by default: the link color alone is under 3:1 against body text,
+   so color cannot be the only cue (WCAG 1.4.1). Navigation components opt out
+   because their position already identifies them as links. */
+a {
+  color: var(--accent-primary-subtle);
+  text-decoration: underline;
+  text-decoration-thickness: from-font;
+  text-underline-offset: 0.2em;
+}
+@media (hover: hover) {
+  a:hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+/* One focus indicator everywhere: the accent ring (verified 3:1 against the
+   page), sized and offset by the platform. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-family-mono);
+  font-size: 0.9em;
+}
+
+/* Inline code only: code inside a <pre> belongs to the block's surface. */
+:where(:not(pre) > code) {
+  background: var(--surface-raised);
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-xs);
+}
+
+pre {
+  background: var(--surface-raised);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  border: var(--border-width-hairline) solid var(--border-subtle);
+}
+
+::selection {
+  background: var(--accent-primary-soft);
+  color: var(--content-primary);
+}
+
+/* Hidden visually, still read by assistive technology (live regions, labels). */
+.cn-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Figures: the material's numeric face with aligned digits. */
+.cn-num {
+  font-family: var(--font-family-numeric);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-semibold);
+}
+
+/* Micro-label: uppercase and tracked in materials that use that voice. */
+.cn-label {
+  font-size: var(--type-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: var(--type-label-transform);
+  color: var(--content-secondary);
+}

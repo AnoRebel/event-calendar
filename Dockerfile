@@ -6,8 +6,8 @@
 FROM node:24-slim AS base
 WORKDIR /app
 
-# Install bun for better performance
-RUN npm install -g bun
+# Bun (package manager + scripts) from its official image, rather than npm.
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 
 # Copy package files
 COPY package.json bun.lock* ./

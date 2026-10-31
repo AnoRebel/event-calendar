@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { events } from "../../db/schema"
 import { dtoToRow, rowToDto } from "../../utils/eventMapper"
 import { CreateEventSchema } from "#shared/schemas/event"
+import { createError, defineEventHandler, setResponseStatus } from "nuxt/server"
 
 // POST /api/events — create an event. Returns 201 with the persisted event.
 export default defineEventHandler(async (event) => {
@@ -10,7 +11,7 @@ export default defineEventHandler(async (event) => {
 
   // Reject recurring events when the feature is disabled (don't rely on hidden UI).
   if (body.isRecurring && !useServerFeatures().recurringEvents) {
-    throw createError({ statusCode: 403, statusMessage: "Recurring events are not enabled" })
+    throw createError({ status: 403, message: "Recurring events are not enabled" })
   }
 
   const now = new Date().toISOString()
@@ -27,6 +28,7 @@ export default defineEventHandler(async (event) => {
 
   const db = useDb()
   const [created] = await db.insert(events).values(row).returning()
+  if (!created) throw createError({ status: 500, message: "Could not create event" })
 
   setResponseStatus(event, 201)
   const dto = rowToDto(created)

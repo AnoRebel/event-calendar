@@ -7,7 +7,7 @@ import type { ViewMode } from '../types'
  */
 export function useKeyboardNavigation(
   currentView: Ref<ViewMode>,
-  currentDate: Ref<Date>,
+  _currentDate: Ref<Date>,
   isModalOpen: Ref<boolean>,
   navigate: (direction: 'prev' | 'next' | 'today') => void,
   openAddModal: () => void
@@ -19,6 +19,8 @@ export function useKeyboardNavigation(
     return (
       !isNavigationEnabled.value ||
       isModalOpen.value ||
+      // Any other open dialog (e.g. a host's settings) owns the keyboard.
+      (typeof document !== 'undefined' && !!document.querySelector('[role="dialog"][data-state="open"], dialog[open]')) ||
       e.target instanceof HTMLInputElement ||
       e.target instanceof HTMLTextAreaElement ||
       (e.target instanceof HTMLElement && e.target.isContentEditable) ||

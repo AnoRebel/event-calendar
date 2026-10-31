@@ -12,8 +12,8 @@ describe('useColorManager', () => {
     
     const { assignUniqueColor } = useColorManager(events)
     
-    const color1 = assignUniqueColor(events.value[0])
-    const color2 = assignUniqueColor(events.value[1])
+    const color1 = assignUniqueColor(events.value[0]!)
+    const color2 = assignUniqueColor(events.value[1]!)
     
     expect(color1).toBeDefined()
     expect(color2).toBeDefined()
