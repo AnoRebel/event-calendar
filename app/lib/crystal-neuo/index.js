@@ -150,4 +150,3 @@ export const prePaintScript = `(()=>{try{var d=document.documentElement,s=localS
     `if(g(${JSON.stringify(STORAGE_KEYS.frost)},["off"]))d.dataset.glassFrost="off";` +
     `if(g(${JSON.stringify(STORAGE_KEYS.rim)},["off"]))d.dataset.glassRim="off"` +
     `}catch(e){}})();`;
-//# sourceMappingURL=index.js.map

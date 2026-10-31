@@ -2,10 +2,14 @@
 
 ## Purpose
 Establishes an end-to-end testing capability using bunwright and a local Chromium-family browser so critical user flows are verified without Playwright.
+
 ## Requirements
+
 ### Requirement: End-to-end tests run on bunwright with a local browser
 
-The e2e suite SHALL use `bunwright` driving a locally installed Chromium-family browser (Brave at `/usr/bin/brave`, with Helium at `/usr/bin/helium-browser` as an alternative), configured via `BUN_CHROME_PATH`. It SHALL NOT depend on Playwright or download browser binaries.
+The e2e suite SHALL use `bunwright` driving a locally installed Chromium-family browser (Chromium, Chrome, Brave or
+Helium), configured via `BUN_CHROME_PATH` and defaulting to the first one found on the machine. It SHALL NOT depend
+on Playwright or download browser binaries.
 
 #### Scenario: Suite runs without Playwright
 
@@ -54,6 +58,16 @@ The suite SHALL cover the primary flows end-to-end against a running app.
 - **WHEN** a test drags an event to a different time slot
 - **THEN** the event moves and the change persists, with the drag driven through raw CDP input events since bunwright exposes no drag API
 
+#### Scenario: Passkey sign-in
+
+- **WHEN** a test registers a passkey with a virtual authenticator, signs out and signs back in with it
+- **THEN** the session is restored and the user's events load
+
+#### Scenario: Appearance and small screens
+
+- **WHEN** a test switches material in the Appearance dialog and reloads at a phone viewport
+- **THEN** the chosen material is applied and the bottom navigation is shown
+
 ### Requirement: Failures produce diagnosable output
 
 Failing tests SHALL capture evidence rather than reporting a bare assertion failure.
@@ -62,4 +76,3 @@ Failing tests SHALL capture evidence rather than reporting a bare assertion fail
 
 - **WHEN** an e2e test fails
 - **THEN** a screenshot is captured to a known path and console output from the page is included
-

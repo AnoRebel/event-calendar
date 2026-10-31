@@ -223,4 +223,3 @@ export function startRefraction(options = {}) {
         delete document.documentElement.dataset.refractionEngine;
     };
 }
-//# sourceMappingURL=refraction.js.map

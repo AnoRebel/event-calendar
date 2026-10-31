@@ -6,7 +6,7 @@ import { Check, Copy } from "@lucide/vue"
 // A package-manager command block for the docs (usable from Markdown as
 // `::install-tabs{item="event-calendar"}`). Give it one of:
 //   item      a registry item name — `shadcn-vue add <this site>/r/<item>.json`
-//   packages  packages to add, e.g. "@vue-dnd-kit/nuxt" (with `dev` for -D)
+//   packages  packages to add, e.g. "@libsql/client" (with `dev` for -D)
 //   run       a package.json script, e.g. "dev"
 // The chosen package manager is shared by every block on the page.
 const props = defineProps<{ item?: string; packages?: string; dev?: boolean; run?: string }>()

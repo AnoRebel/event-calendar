@@ -10,7 +10,7 @@
  *   CRYSTAL_NEUO_DIR=../crystal-neuo bun run design:sync
  */
 import { execSync } from "node:child_process"
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 const src = resolve(process.env.CRYSTAL_NEUO_DIR || "../crystal-neuo")
@@ -46,7 +46,11 @@ copyWithBanner(join(src, "packages/css/src/base.css"), join(cssOut, "base.css"))
 copyWithBanner(join(src, "packages/css/src/components.css"), join(cssOut, "components.css"))
 
 for (const file of readdirSync(runtimeDir)) {
-  if (file.endsWith(".js")) copyFileSync(join(runtimeDir, file), join(runtimeOut, file))
+  // Source maps aren't vendored, so drop the references to them.
+  if (file.endsWith(".js")) {
+    const js = readFileSync(join(runtimeDir, file), "utf8").replace(/^\/\/# sourceMappingURL=.*$/m, "")
+    writeFileSync(join(runtimeOut, file), js)
+  }
   // Declarations are emitted with source-style `./axes.ts` specifiers; point them
   // at the shipped `.js` modules so they resolve outside the Crystal Neuo repo.
   if (file.endsWith(".d.ts")) {

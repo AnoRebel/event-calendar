@@ -67,8 +67,8 @@ export function usePointerDrag(options: PointerDragOptions) {
   function apply() {
     frame = 0
     if (!dragging.value || !last) return
-    const next = options.resolve(dragging.value, last.x, last.y)
-    if (next) preview.value = next
+    // Outside every target the event snaps back, so releasing there cancels.
+    preview.value = options.resolve(dragging.value, last.x, last.y) ?? dragging.value
   }
 
   function onUp(e: PointerEvent) {

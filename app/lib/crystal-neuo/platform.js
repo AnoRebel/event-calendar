@@ -34,4 +34,3 @@ export function detectPlatform(nav = globalThis.navigator) {
         return "windows";
     return "web";
 }
-//# sourceMappingURL=platform.js.map

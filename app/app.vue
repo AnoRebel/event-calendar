@@ -36,9 +36,7 @@ useHead({
 </script>
 
 <template>
-  <!-- DnDProvider must wrap the app: vue-dnd-kit v2 composables run via inject
-       inside descendant components (the calendar views). -->
-  <DnDProvider>
+  <div>
     <NuxtRouteAnnouncer />
     <NuxtLayout>
       <NuxtPage />
@@ -48,6 +46,5 @@ useHead({
       :position="isPhone ? 'top-center' : 'bottom-right'"
       close-button
     />
-    <DragPreview />
-  </DnDProvider>
+  </div>
 </template>

@@ -17,7 +17,6 @@
         "valibot",
         "reka-ui",
         "uuid",
-        "@vue-dnd-kit/core",
         "vue-sonner",
         "@lucide/vue"
       ],
@@ -110,11 +109,6 @@
           "path": "app/registry/event-calendar/composables/useCompatibility.ts",
           "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useCompatibility.ts"
-        },
-        {
-          "path": "app/registry/event-calendar/composables/useDragAndDrop.ts",
-          "type": "registry:file",
-          "target": "components/ui/event-calendar/composables/useDragAndDrop.ts"
         },
         {
           "path": "app/registry/event-calendar/composables/useEventFiltering.ts",

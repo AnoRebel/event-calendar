@@ -184,6 +184,9 @@ function applyPointer() {
         zone.dataset.type === "allDay"
           ? moveToAllDay(g.event, dateKey)
           : moveToTime(g.event, dateKey, minutesInColumn(y, zone) - g.grabMinutes)
+    } else {
+      // Outside the grid: snap back; releasing here cancels the move.
+      preview.value = g.event
     }
   }
   autoScroll(y)

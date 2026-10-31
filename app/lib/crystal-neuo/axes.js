@@ -10,4 +10,3 @@ export const DEFAULT_MATERIAL = "refraction";
 export const DEFAULT_PLATFORM = "web";
 /** Materials that render translucent glass, and so offer refraction controls. */
 export const GLASS_MATERIALS = ["refraction", "bloom", "hybrid"];
-//# sourceMappingURL=axes.js.map

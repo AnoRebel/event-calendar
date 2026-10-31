@@ -77,7 +77,6 @@ export default defineNuxtConfig({
     "@nuxt/image",
     "@nuxt/scripts",
     "nuxt-umami",
-    "@vue-dnd-kit/nuxt",
     "nuxt-auth-utils",
     "nuxt-authorization",
     "@nuxt/content",
