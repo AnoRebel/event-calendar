@@ -135,8 +135,9 @@ export async function startServerIfNeeded(): Promise<void> {
   })
   if (!migrate.success) throw new Error("[e2e] migrations failed")
   // The app is auth-gated — the session cookie is sealed with a key derived from
-  // the app secret.
-  const appSecret = process.env.NUXT_APP_SECRET || "e2e-test-app-secret-at-least-32-characters"
+  // the app secret. Random by default: the built server's secrets guard rejects
+  // known placeholder values.
+  const appSecret = process.env.NUXT_APP_SECRET || crypto.randomUUID() + crypto.randomUUID()
   serverProc = spawn(["node", ".output/server/index.mjs"], {
     env: {
       ...process.env,
