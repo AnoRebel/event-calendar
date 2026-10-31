@@ -167,7 +167,8 @@ const calendarTitle = computed(() => {
 const openAddModalHandler = (date?: Date, isAllDaySlot?: boolean, allDayTargetDate?: Date) => {
   popupMode.value = "add"
   eventForPopup.value = null
-  popupTargetDate.value = allDayTargetDate || date || new Date()
+  // No date (toolbar, shortcut, deep link): the dialog starts at the next full hour.
+  popupTargetDate.value = allDayTargetDate || date || null
   popupIsAllDayFromCell.value = !!isAllDaySlot
   isEventModalOpen.value = true
 }
