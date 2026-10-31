@@ -144,6 +144,8 @@ export async function startServerIfNeeded(): Promise<void> {
       PORT: port,
       NITRO_PORT: port,
       LIBSQL_URL: libsqlUrl,
+      // runtimeConfig.libsql.url is baked in at build time; this is its runtime override.
+      NUXT_LIBSQL_URL: libsqlUrl,
       NUXT_APP_SECRET: appSecret,
       NUXT_OPEN_REGISTRATION: "true",
       NUXT_DEMO_ENABLED: "true",
