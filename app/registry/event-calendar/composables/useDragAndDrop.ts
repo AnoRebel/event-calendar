@@ -249,7 +249,7 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
           allDay: false 
         }
 
-      default:
+      default: {
         const originalStart = new Date(originalEvent.startDate)
         const originalEnd = new Date(originalEvent.endDate)
         
@@ -264,6 +264,7 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
           startDate: newStart, 
           endDate: newEnd 
         }
+      }
     }
   }
 

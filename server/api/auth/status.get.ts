@@ -8,7 +8,7 @@ import { defineEventHandler, useRuntimeConfig } from "nuxt/server"
 export default defineEventHandler(async () => {
   const { openRegistration, demo } = useRuntimeConfig()
 
-  let needsBootstrap = false
+  let needsBootstrap: boolean
   try {
     // Exclude the demo account so the first REAL human can still bootstrap.
     const demoEmail = demo?.email?.trim().toLowerCase() || ""

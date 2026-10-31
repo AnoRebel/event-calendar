@@ -83,7 +83,7 @@ function getAllTimezones(): TimezoneInfo[] {
             label: `${city} (${region})`,
             offset: offsetString,
           }
-        } catch (error) {
+        } catch {
           // Fallback for problematic timezones
           return {
             timezone,
@@ -93,7 +93,7 @@ function getAllTimezones(): TimezoneInfo[] {
         }
       })
       .sort((a, b) => a.label.localeCompare(b.label))
-  } catch (error) {
+  } catch {
     // Fallback to common timezones if Intl.supportedValuesOf is not available
     console.warn("Intl.supportedValuesOf not available, using fallback timezones")
     return getCommonTimezones()

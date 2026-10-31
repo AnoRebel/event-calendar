@@ -80,7 +80,8 @@ export function useSecurity(
     
     // Allow only specified HTML tags
     const allowedTags = securityConfig.value.allowedHtmlTags.join('|')
-    const tagRegex = new RegExp(`<(?!\/?(?:${allowedTags})(?:\s|>))[^>]*>`, 'gi')
+    // Inside a template string the backslash must be doubled, or \s becomes a plain "s".
+    const tagRegex = new RegExp(`<(?!/?(?:${allowedTags})(?:\\s|>))[^>]*>`, 'gi')
     sanitized = sanitized.replace(tagRegex, '')
     
     // Encode remaining dangerous characters

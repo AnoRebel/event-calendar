@@ -6,24 +6,19 @@
 //   2. Own the bunwright browser lifecycle (single shared page).
 //   3. Expose small helpers used across specs.
 //
-// Browser: bunwright drives Brave via Bun.WebView. Set BUN_CHROME_PATH to point
-// at the binary (/usr/bin/brave here). On Linux we prefer the X11 GDK backend for
+// Browser: bunwright drives a Chromium-family browser via Bun.WebView (see
+// bunwright.config.ts; BUN_CHROME_PATH overrides the auto-detected binary). On Linux we prefer the X11 GDK backend for
 // stability. NOTE: Bun.WebView is known to orphan Chromium helper processes across
 // many launches on Linux (oven-sh/bun#30475) — reapOrphans() cleans them up.
-process.env.GDK_BACKEND ||= "x11"
-delete process.env.WAYLAND_DISPLAY
-
 import { browser, type Page } from "bunwright"
 import { spawn, spawnSync, type Subprocess } from "bun"
 import { existsSync } from "node:fs"
 
-// bunwright auto-loads bunwright.config.ts from the project root (resolution order:
-// built-in defaults ← config file ← defineConfig() call). We do NOT call
-// browser.config() here — doing so alongside the auto-loaded file is what caused
-// the WebView to hang on navigate. The Brave path comes from bunwright.config.ts,
-// and BUN_CHROME_PATH (honored first in Bun.WebView's Chrome search order)
-// overrides it. On this machine the binary is /usr/bin/brave (not brave-browser,
-// which is the only Brave name Bun.WebView probes by default).
+process.env.GDK_BACKEND ||= "x11"
+delete process.env.WAYLAND_DISPLAY
+
+// bunwright auto-loads bunwright.config.ts from the project root; we do NOT call
+// browser.config() here (configuring twice made the WebView hang on navigate).
 
 export const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:3100"
 
@@ -53,37 +48,29 @@ export async function openApp(path = "/"): Promise<Page> {
   return p
 }
 
-// The app is auth-gated: register a fresh user through the AuthPanel UI so the
-// calendar becomes reachable. Idempotent per suite (skips if already signed in).
+// Sign up a fresh password account through the API (registration is open in the
+// e2e server) so tests that need a session start from the calendar. The session
+// cookie lives in the shared WebView.
 let signedIn = false
-const ADD_EVENT = 'css:[data-testid="add-event"]'
-
 export async function ensureSignedIn(): Promise<Page> {
-  const p = await openApp("/")
-  if (signedIn) return p
-
-  // If the calendar is already visible (returning session), we're done.
-  if (await p.exists(ADD_EVENT)) {
+  const p = await openApp("/login")
+  if (!signedIn) {
+    await p.evaluate(() =>
+      fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: `e2e-${Date.now()}@example.com`, password: "password12345", name: "E2E" }),
+      }).then(r => r.status),
+    )
     signedIn = true
-    return p
   }
-
-  // Otherwise drive the sign-up form. Switch to register mode first (the toggle
-  // button says "Sign up" when currently in login mode).
-  if (await p.exists("role:button[name='Sign up']")) {
-    await p.click("role:button[name='Sign up']")
-    await p.waitForTimeout(300)
-  }
-
-  const stamp = `${process.pid}${Math.floor(process.uptime() * 1000)}`
-  await p.type('css:input[type="email"]', `e2e_${stamp}@test.com`)
-  await p.type('css:input[type="password"]', "password12345")
-  await p.click('css:button[type="submit"]')
-
-  // Wait for the calendar to appear (poll via exists).
-  await waitForSel(p, ADD_EVENT, 12_000)
-  signedIn = true
+  await openApp("/")
+  await waitForSel(p, 'css:[data-testid="add-event"]', 15_000)
   return p
+}
+
+export function resetSignedIn() {
+  signedIn = false
 }
 
 // Poll until a selector exists, or throw after `timeout` ms. bunwright's own
@@ -129,17 +116,24 @@ export async function startServerIfNeeded(): Promise<void> {
   const port = new URL(BASE_URL).port || "3100"
 
   if (!existsSync(".output/server/index.mjs")) {
-    // eslint-disable-next-line no-console
+     
     console.log("[e2e] no build found — running `bun run build`…")
     const build = spawnSync(["bun", "run", "build"], { stdout: "inherit", stderr: "inherit" })
     if (!build.success) throw new Error("[e2e] build failed")
   }
 
-  // eslint-disable-next-line no-console
+   
   console.log(`[e2e] starting app server on :${port}…`)
   // Default the spawned server to the local dev libSQL file if no URL is set, so
   // the e2e run has real persistence without extra configuration.
-  const libsqlUrl = process.env.LIBSQL_URL || process.env.DATABASE_URL || `file:${process.cwd()}/.data/events.db`
+  // A fresh database per run, migrated with the same runner the Docker image uses.
+  const libsqlUrl = process.env.LIBSQL_URL || `file:${process.cwd()}/.data/e2e-${Date.now()}.db`
+  const migrate = spawnSync(["node", "scripts/migrate-runtime.mjs"], {
+    env: { ...process.env, LIBSQL_URL: libsqlUrl },
+    stdout: "inherit",
+    stderr: "inherit",
+  })
+  if (!migrate.success) throw new Error("[e2e] migrations failed")
   // The app is auth-gated — the session cookie is sealed with a key derived from
   // the app secret.
   const appSecret = process.env.NUXT_APP_SECRET || "e2e-test-app-secret-at-least-32-characters"
@@ -150,6 +144,9 @@ export async function startServerIfNeeded(): Promise<void> {
       NITRO_PORT: port,
       LIBSQL_URL: libsqlUrl,
       NUXT_APP_SECRET: appSecret,
+      NUXT_OPEN_REGISTRATION: "true",
+      NUXT_DEMO_ENABLED: "true",
+      NUXT_PUBLIC_ENABLE_ANALYTICS: "false",
       NODE_ENV: "development",
     },
     stdout: "ignore",
@@ -172,8 +169,8 @@ export function stopServer(): void {
 }
 
 // Kill orphaned Bun.WebView helper processes (oven-sh/bun#30475). Best-effort;
-// scoped to the /tmp/bun-chrome-* profiles bunwright spawns so we don't touch a
-// user's own Brave session.
+// scoped to the /tmp/bun-chrome-* profiles bunwright spawns so we don't touch the
+// user's own browser.
 function reapOrphans(): void {
   try {
     spawnSync(["pkill", "-9", "-f", "user-data-dir=/tmp/bun-chrome-"])
@@ -188,10 +185,49 @@ export async function captureFailure(page: Page, name: string): Promise<void> {
   try {
     const safe = name.replace(/[^a-z0-9-_]+/gi, "_")
     await page.screenshot(`${ARTIFACT_DIR}/${safe}.png`)
-    // eslint-disable-next-line no-console
+     
     console.error(`[e2e] captured failure screenshot: ${ARTIFACT_DIR}/${safe}.png`)
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.error("[e2e] failed to capture screenshot:", err)
   }
+}
+
+// Evaluate an expression in the page via CDP. Unlike page.evaluate(), this can
+// take values from the test (interpolate them as JSON).
+export async function evalJS<T>(page: Page, expression: string): Promise<T> {
+  const res = (await page.cdp("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })) as {
+    result?: { value?: T }
+  }
+  return res.result?.value as T
+}
+
+/** Whether visible text containing `text` is on the page. */
+export function hasText(page: Page, text: string): Promise<boolean> {
+  return evalJS(page, `document.body.innerText.includes(${JSON.stringify(text)})`)
+}
+
+export async function waitForText(page: Page, text: string, timeout = 8_000): Promise<void> {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    if (await hasText(page, text)) return
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`[e2e] timed out waiting for text "${text}"`)
+}
+
+/** Click the innermost button-like element whose text contains `text`. */
+export async function clickText(page: Page, text: string): Promise<void> {
+  const clicked = await evalJS<boolean>(
+    page,
+    `(() => {
+      const t = ${JSON.stringify(text)}
+      const candidates = [...document.querySelectorAll('button, [role="button"], a')]
+        .filter(el => el.textContent.includes(t) && el.getClientRects().length)
+      const el = candidates.sort((a, b) => a.textContent.length - b.textContent.length)[0]
+      el?.click()
+      return !!el
+    })()`,
+  )
+  if (!clicked) throw new Error(`[e2e] nothing clickable with text "${text}"`)
 }

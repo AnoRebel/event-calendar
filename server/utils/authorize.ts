@@ -7,6 +7,8 @@ import type { BouncerAbility, BouncerArgs } from "nuxt-authorization/utils"
 // the same request event (nuxt-authorization only reads `event.context` and the
 // session resolved by server/plugins/authorization.ts), so this bridges the types
 // in one place instead of casting in every handler.
+// `any` mirrors nuxt-authorization's own constraint on abilities.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function authorizeRequest<Ability extends BouncerAbility<any>>(
   event: RequestEvent,
   ability: Ability,

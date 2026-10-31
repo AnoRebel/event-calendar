@@ -1,9 +1,10 @@
 import { ref, readonly } from 'vue'
 import type { CalendarEvent, RecurringPattern } from '../types'
 
-interface ValidationRule<T = any> {
+interface ValidationRule<T = unknown> {
   name: string
-  validate: (value: T, context?: any) => boolean
+  // Method syntax: each rule may narrow `value` to the type it checks.
+  validate(value: T, context?: unknown): boolean
   message: string
   severity: 'error' | 'warning' | 'info'
 }
@@ -20,7 +21,7 @@ interface ValidationError {
   rule: string
   message: string
   severity: 'error' | 'warning' | 'info'
-  value?: any
+  value?: unknown
 }
 
 interface ValidationContext {
@@ -186,7 +187,7 @@ export function useAdvancedValidation(context: ValidationContext = {
 
     // Validate against core rules
     coreRules.forEach(rule => {
-      let isValid = false
+      let isValid: boolean
       try {
         switch (rule.name) {
           case 'required_title':
@@ -209,7 +210,7 @@ export function useAdvancedValidation(context: ValidationContext = {
           default:
             isValid = rule.validate(event, event)
         }
-      } catch (error) {
+      } catch {
         isValid = false
       }
 
@@ -239,10 +240,10 @@ export function useAdvancedValidation(context: ValidationContext = {
     // Validate recurring pattern if present
     if (event.isRecurring && event.recurringPattern) {
       recurringRules.forEach(rule => {
-        let isValid = false
+        let isValid: boolean
         try {
           isValid = rule.validate(event.recurringPattern!, event)
-        } catch (error) {
+        } catch {
           isValid = false
         }
 
@@ -272,10 +273,10 @@ export function useAdvancedValidation(context: ValidationContext = {
 
     // Check custom rules
     customRules.value.forEach(rule => {
-      let isValid = false
+      let isValid: boolean
       try {
         isValid = rule.validate(event, validationContext.value)
-      } catch (error) {
+      } catch {
         isValid = false
       }
 
@@ -518,9 +519,9 @@ export function useAdvancedValidation(context: ValidationContext = {
     return fieldMap[ruleName] || 'unknown'
   }
 
-  const getFieldValue = (event: CalendarEvent, ruleName: string): any => {
+  const getFieldValue = (event: CalendarEvent, ruleName: string): unknown => {
     const fieldName = getFieldFromRule(ruleName)
-    return (event as any)[fieldName]
+    return (event as unknown as Record<string, unknown>)[fieldName]
   }
 
   // Custom rule management

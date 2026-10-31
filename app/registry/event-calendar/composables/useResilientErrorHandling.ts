@@ -8,7 +8,7 @@ interface ErrorContext {
   userAgent: string
   url: string
   userId?: string
-  additionalData?: Record<string, any>
+  additionalData?: Record<string, unknown>
 }
 
 interface ErrorRecoveryStrategy {
@@ -276,7 +276,7 @@ export function useResilientErrorHandling() {
 
   // Offline detection and handling
   const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
-  const offlineOperations = ref<Array<{ operation: () => Promise<any>; context: ErrorContext }>>([])
+  const offlineOperations = ref<Array<{ operation: () => Promise<unknown>; context: ErrorContext }>>([])
 
   const handleOnlineStatusChange = (): void => {
     isOnline.value = navigator.onLine
@@ -301,7 +301,7 @@ export function useResilientErrorHandling() {
   }
 
   const queueOfflineOperation = (
-    operation: () => Promise<any>,
+    operation: () => Promise<unknown>,
     context: Partial<ErrorContext> = {}
   ): void => {
     offlineOperations.value.push({

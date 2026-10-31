@@ -95,7 +95,7 @@ const convertToDateValue = (date: Date, timezone: string = "UTC"): DateValue => 
     // Method 1: Using fromDate and converting to CalendarDate
     const zonedDateTime = fromDate(date, timezone)
     return new CalendarDate(zonedDateTime.year, zonedDateTime.month, zonedDateTime.day)
-  } catch (error) {
+  } catch {
     // Fallback: Manual construction
     return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate())
   }
@@ -125,12 +125,13 @@ const getTZDisplayName = (timezone: string) => {
 }
 
 // Helper to ensure proper Date object for Calendar component
-const ensureValidDate = (value: any): Date => {
+const ensureValidDate = (value: unknown): Date => {
   if (!value) return new Date()
-  if (value instanceof Date && !isNaN(value.getTime())) return value
-  if ("calendar" in value) return toDate(value)
-  const parsed = new Date(value)
-  return !isNaN(parsed.getTime()) ? parsed : new Date()
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? new Date() : value
+  // reka-ui calendars emit @internationalized/date values.
+  if (typeof value === "object" && "calendar" in value) return toDate(value as DateValue)
+  const parsed = new Date(value as string | number)
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed
 }
 
 

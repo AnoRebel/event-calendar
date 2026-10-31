@@ -48,8 +48,8 @@ vi.mock('../composables/useColorManager', () => ({
   })
 }))
 
-vi.mock('../composables/useDragAndDrop', () => {
-  const { ref, computed } = require('vue')
+vi.mock('../composables/useDragAndDrop', async () => {
+  const { ref, computed } = await import('vue')
   return {
     useDragAndDropSystem: () => ({
       globalDragState: { value: { isDragging: false, draggedEvent: null, validDropZones: [], currentDropZone: null, dragPreview: null } },

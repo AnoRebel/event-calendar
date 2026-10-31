@@ -28,7 +28,7 @@ export interface RecurringPattern {
   endsNever?: boolean // For events that never end
   daysOfWeek?: number[] // For weekly: 0=Sunday, 1=Monday, etc.
   dayOfMonth?: number // For monthly
-  monthOfYear?: number // For yearly
+  monthOfYear?: number // For yearly: 1 = January … 12 = December
 }
 
 export type ViewMode = "month" | "week" | "day" | "agenda"

@@ -12,6 +12,10 @@ import {
 import { computed, type HTMLAttributes } from 'vue'
 import DialogOverlay from './DialogOverlay.vue'
 
+// The root is a portal, so pass attributes (data-testid, aria-*, id) through to
+// the content element instead of losing them.
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<DialogContentProps & { class?: HTMLAttributes['class'] }>()
 const emits = defineEmits<DialogContentEmits>()
 
@@ -29,7 +33,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     <DialogOverlay />
     <DialogContent
       data-slot="dialog-content"
-      v-bind="forwarded"
+      v-bind="{ ...$attrs, ...forwarded }"
       :class="
         cn(
           // Phones: a bottom sheet that scrolls internally and respects the home
