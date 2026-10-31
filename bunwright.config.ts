@@ -15,15 +15,16 @@ const candidates = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ]
 
-// Chromium refuses to run as root with its sandbox (CI containers); only then
-// is it disabled.
-const runningAsRoot = process.getuid?.() === 0
+// Chromium refuses to run as root with its sandbox (CI containers), and Ubuntu
+// 24.04 runners block the user-namespace sandbox via AppArmor; only then is it
+// disabled.
+const disableSandbox = process.getuid?.() === 0 || !!process.env.CI
 
 export default defineConfig({
   backend: {
     type: "chrome",
     path: process.env.BUN_CHROME_PATH || candidates.find(existsSync) || "/usr/bin/chromium",
-    argv: runningAsRoot ? ["--no-sandbox"] : [],
+    argv: disableSandbox ? ["--no-sandbox"] : [],
   },
   headless: true,
 })
