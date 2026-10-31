@@ -239,7 +239,7 @@ describe('EventCalendar', () => {
   })
 
   it('handles multi-day events', () => {
-    const wrapper = mount(EventCalendar, {
+    mount(EventCalendar, {
       props: {
         events: mockEvents
       }

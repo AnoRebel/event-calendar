@@ -1,5 +1,8 @@
 import tailwindcss from "@tailwindcss/vite"
+import { readFileSync } from "node:fs"
 import { prePaintScript } from "./app/lib/crystal-neuo/index.js"
+
+const appVersion = (JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string }).version
 
 // Analytics site IDs are resolved at BUILD time. nuxt-umami bakes its site id into
 // a generated config during the module setup hook, so setting NUXT_UMAMI_SITE_ID
@@ -77,7 +80,23 @@ export default defineNuxtConfig({
     "@vue-dnd-kit/nuxt",
     "nuxt-auth-utils",
     "nuxt-authorization",
+    "@nuxt/content",
   ],
+
+  // In-app documentation (content/docs → /docs). Node's built-in SQLite keeps the
+  // index without a native dependency; code is highlighted at build time.
+  content: {
+    experimental: { sqliteConnector: "native" },
+    build: {
+      markdown: {
+        toc: { depth: 3, searchDepth: 3 },
+        highlight: {
+          theme: { default: "github-light", dark: "github-dark" },
+          langs: ["bash", "ts", "js", "vue", "vue-html", "json", "yaml", "css", "html", "sql", "dockerfile", "ini"],
+        },
+      },
+    },
+  },
 
   // CSS optimization
   css: ["~/assets/css/main.css"],
@@ -170,13 +189,14 @@ export default defineNuxtConfig({
 
     // Public keys (exposed to client-side)
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || "/api",
       enableAnalytics: process.env.NUXT_PUBLIC_ENABLE_ANALYTICS !== "false",
-      version: process.env.npm_package_version || "1.0.0",
+      version: appVersion,
       // Feature flags — default off; gate both UI and (where relevant) the server.
+      // FEATURE_* sets the build-time default; NUXT_PUBLIC_FEATURES_* overrides it
+      // at runtime without a rebuild (Nuxt's runtime-config convention).
       features: {
-        recurringEvents: flag(process.env.NUXT_PUBLIC_FEATURE_RECURRING_EVENTS ?? process.env.FEATURE_RECURRING_EVENTS),
-        collaboration: flag(process.env.NUXT_PUBLIC_FEATURE_COLLABORATION ?? process.env.FEATURE_COLLABORATION),
+        recurringEvents: flag(process.env.FEATURE_RECURRING_EVENTS),
+        collaboration: flag(process.env.FEATURE_COLLABORATION),
       },
     },
   },
@@ -213,6 +233,9 @@ export default defineNuxtConfig({
   // consumers — they use consumer-relative imports, so they are not app code.
   typescript: {
     tsConfig: {
+      // Match the strictness of a fresh Vite + Vue project, so the registry
+      // calendar compiles cleanly wherever it's installed.
+      compilerOptions: { noUnusedLocals: true, noUnusedParameters: true },
       exclude: [
         "../app/registry/event-calendar-data",
         "../app/registry/event-calendar-persistence",

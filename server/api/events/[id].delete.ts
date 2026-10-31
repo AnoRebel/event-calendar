@@ -6,7 +6,7 @@ import { createError, defineEventHandler, getRouterParam, setResponseStatus } fr
 // DELETE /api/events/:id — remove an event. 401 unauthenticated, 403 non-owner,
 // 204 on success, 404 if missing.
 export default defineEventHandler(async (event) => {
-  const { user } = await requireUserSession(event)
+  await requireUserSession(event)
 
   const id = getRouterParam(event, "id")
   if (!id) {

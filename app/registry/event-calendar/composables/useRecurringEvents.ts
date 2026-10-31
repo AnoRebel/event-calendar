@@ -1,4 +1,4 @@
-import { computed, ref, type ComputedRef } from 'vue'
+import { computed, type ComputedRef } from 'vue'
 import { 
   addDays, 
   addWeeks, 
@@ -6,13 +6,10 @@ import {
   addYears, 
   isBefore, 
   isAfter, 
-  startOfDay,
-  endOfDay,
   setDay,
   getDay,
   format
 } from 'date-fns'
-import { v4 as uuidv4 } from 'uuid'
 import type { CalendarEvent, RecurringPattern } from '../types'
 
 export function useRecurringEvents(events: ComputedRef<CalendarEvent[]>) {

@@ -1,6 +1,6 @@
 import { ref } from "vue"
 import { parseISO } from "date-fns"
-import type { CalendarEvent } from "@/components/event-calendar/types"
+import type { CalendarEvent } from "@/components/ui/event-calendar/types"
 
 // Wire-format event: dates are ISO strings over HTTP.
 interface EventDTO extends Omit<CalendarEvent, "startDate" | "endDate"> {

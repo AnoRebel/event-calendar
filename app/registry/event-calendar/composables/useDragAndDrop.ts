@@ -62,7 +62,7 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
     zoneType: 'all-day' | 'timed' | 'day-cell',
     dateKey: string,
     onEventUpdate: (event: CalendarEvent) => void,
-    pixelsPerHour = 60
+    _pixelsPerHour = 60 // kept for API compatibility; drops pass minutes directly
   ) => {
     // `minutes` (past midnight) is where the event was dropped in a timed column.
     const handleDrop = (droppedEvent: CalendarEvent, minutes?: number) => {
@@ -191,10 +191,9 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
   }
 
   // Validate if an event can be dropped in a specific zone
-  const validateDropZone = (event: CalendarEvent, targetElement: HTMLElement): boolean => {
+  const validateDropZone = (_event: CalendarEvent, targetElement: HTMLElement): boolean => {
     if (!finalConfig.allowDateChange && !finalConfig.allowTimeChange) return false
     
-    const targetType = targetElement.dataset.type
     const targetDate = targetElement.dataset.dateKey
     
     if (!targetDate) return false

@@ -2,7 +2,7 @@
 import { computed, ref } from "vue"
 import { endOfDay, format, isSameDay, isWithinInterval, startOfDay, subMilliseconds } from "date-fns"
 import { useMediaQuery } from "@vueuse/core"
-import { Plus } from "lucide-vue-next"
+import { Plus } from "@lucide/vue"
 import type { CalendarEvent, MonthViewDay } from "./types"
 import { useColorManager } from "./composables/useColorManager"
 import { useEventStatus } from "./composables/useEventStatus"

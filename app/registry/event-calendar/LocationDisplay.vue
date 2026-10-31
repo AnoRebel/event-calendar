@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { MapPin } from "lucide-vue-next"
+import { MapPin } from "@lucide/vue"
 
 interface LocationDisplayProps {
   location?: string

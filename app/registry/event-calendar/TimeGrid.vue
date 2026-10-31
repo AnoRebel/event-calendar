@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 import { addMinutes, differenceInMinutes, format, isSameDay, startOfDay } from "date-fns"
 import { useIntervalFn, useNow } from "@vueuse/core"
-import { MapPin, Plus } from "lucide-vue-next"
+import { MapPin, Plus } from "@lucide/vue"
 import type { CalendarEvent, DayColumnData } from "./types"
 import { useColorManager } from "./composables/useColorManager"
 import { useEventStatus } from "./composables/useEventStatus"

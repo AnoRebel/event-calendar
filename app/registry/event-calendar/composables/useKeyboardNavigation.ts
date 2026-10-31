@@ -7,7 +7,7 @@ import type { ViewMode } from '../types'
  */
 export function useKeyboardNavigation(
   currentView: Ref<ViewMode>,
-  currentDate: Ref<Date>,
+  _currentDate: Ref<Date>,
   isModalOpen: Ref<boolean>,
   navigate: (direction: 'prev' | 'next' | 'today') => void,
   openAddModal: () => void

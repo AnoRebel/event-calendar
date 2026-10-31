@@ -8,7 +8,7 @@ import { createError, defineEventHandler, getRouterParam } from "nuxt/server"
 // PATCH /api/events/:id — update an event. 401 unauthenticated, 403 non-owner,
 // 404 if it doesn't exist.
 export default defineEventHandler(async (event) => {
-  const { user } = await requireUserSession(event)
+  await requireUserSession(event)
 
   const id = getRouterParam(event, "id")
   if (!id) {

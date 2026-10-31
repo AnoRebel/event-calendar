@@ -1,6 +1,6 @@
 import { computed, ref, type ComputedRef } from "vue"
 import { format } from "date-fns"
-import { TZDate, tz } from "@date-fns/tz"
+import { TZDate } from "@date-fns/tz"
 import type { CalendarEvent } from "../types"
 import { getLocalTimeZone } from "@internationalized/date"
 

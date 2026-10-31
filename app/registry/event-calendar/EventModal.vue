@@ -14,7 +14,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -30,7 +29,7 @@ import { cn } from "@/lib/utils"
 import type { CalendarEvent, EventColor, EventStatus } from "./types"
 import { EndHour, StartHour } from "./constants"
 import { useTimezone } from "./composables/useTimezone"
-import { Calendar as CalendarIcon, MapPin, Globe, ChevronsUpDown, Check, Repeat } from "lucide-vue-next"
+import { Calendar as CalendarIcon, MapPin, Globe, ChevronsUpDown, Check, Repeat } from "@lucide/vue"
 
 const props = defineProps<{
   isOpen: boolean
@@ -134,19 +133,6 @@ const ensureValidDate = (value: any): Date => {
   return !isNaN(parsed.getTime()) ? parsed : new Date()
 }
 
-// Filter timezones based on search term
-const filteredTimezones = computed(() => {
-  if (!timezoneSearchTerm.value) {
-    return commonTimezones
-  }
-  const searchLower = timezoneSearchTerm.value.toLowerCase()
-  return commonTimezones.filter(
-    tz =>
-      tz.label.toLowerCase().includes(searchLower) ||
-      tz.timezone.toLowerCase().includes(searchLower) ||
-      tz.offset.toLowerCase().includes(searchLower)
-  )
-})
 
 // Default start/end for a new event. A slot click (a target with a time) starts
 // there; otherwise the next full hour today (or 09:00 on another day). Events
@@ -506,24 +492,26 @@ const fieldErrors = (errors: unknown[]) =>
 
 <template>
   <Dialog :open="isOpen" @update:open="closePopup">
-    <DialogContent class="gap-0 p-0 sm:max-w-xl sm:p-0">
-      <form class="flex min-h-0 flex-col" @submit.prevent="form.handleSubmit">
-        <DialogHeader class="px-5 pt-1 pb-4 sm:px-6 sm:pt-6">
+    <!-- The dialog scrolls its own body between a fixed header and footer, so it
+         fits the screen with any DialogContent (the app's or shadcn's stock one). -->
+    <DialogContent class="flex max-h-[calc(100dvh-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[calc(100dvh-4rem)] sm:max-w-xl sm:p-0">
+      <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="form.handleSubmit">
+        <DialogHeader class="shrink-0 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
           <DialogTitle>{{ mode === "add" ? "New event" : "Edit event" }}</DialogTitle>
           <DialogDescription>
             {{ mode === "add" ? "Add an event to your calendar." : "Change the details of this event." }}
           </DialogDescription>
         </DialogHeader>
 
-        <div class="grid min-w-0 gap-4 px-5 pb-5 sm:px-6">
-          <p v-if="error" role="alert" class="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger-content">
+        <div class="grid min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto overscroll-contain px-5 pb-5 sm:px-6">
+          <p v-if="error" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {{ error }}
           </p>
 
           <form.Field name="title" :validators="{ onBlur: titleSchema, onSubmit: titleSchema }">
             <template #default="{ field }">
               <div :class="fieldClass">
-                <Label :for="field.name">Title <span class="text-danger-content" aria-hidden="true">*</span></Label>
+                <Label :for="field.name">Title <span class="text-destructive" aria-hidden="true">*</span></Label>
                 <Input
                   :id="field.name"
                   :name="field.name"
@@ -533,7 +521,7 @@ const fieldErrors = (errors: unknown[]) =>
                   @blur="field.handleBlur"
                   @update:model-value="(v) => field.handleChange(String(v))"
                 />
-                <p v-if="!field.state.meta.isValid" class="text-xs text-danger-content">
+                <p v-if="!field.state.meta.isValid" class="text-xs text-destructive">
                   {{ fieldErrors(field.state.meta.errors) }}
                 </p>
               </div>
@@ -542,7 +530,7 @@ const fieldErrors = (errors: unknown[]) =>
 
           <!-- When: date + time pairs. Grid tracks with minmax(0, …) can never
                push the dialog wider than the screen. -->
-          <fieldset class="grid min-w-0 gap-3 rounded-lg border border-line-subtle bg-muted/40 p-3 sm:p-4">
+          <fieldset class="grid min-w-0 gap-3 rounded-lg border border-border bg-muted/40 p-3 sm:p-4">
             <legend class="sr-only">When</legend>
             <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,8.5rem)] gap-3" :class="isAllDay && 'grid-cols-1'">
               <form.Field name="startDate">
@@ -655,7 +643,7 @@ const fieldErrors = (errors: unknown[]) =>
             <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
               <form.Field name="allDay">
                 <template #default="{ field }">
-                  <div class="flex min-h-touch items-center gap-2">
+                  <div class="flex min-h-11 items-center gap-2">
                     <Checkbox
                       :id="field.name"
                       :name="field.name"
@@ -739,7 +727,7 @@ const fieldErrors = (errors: unknown[]) =>
                     @update:model-value="(v) => field.handleChange(String(v))"
                   />
                 </div>
-                <p v-if="!field.state.meta.isValid" class="text-xs text-danger-content">
+                <p v-if="!field.state.meta.isValid" class="text-xs text-destructive">
                   {{ fieldErrors(field.state.meta.errors) }}
                 </p>
               </div>
@@ -758,7 +746,7 @@ const fieldErrors = (errors: unknown[]) =>
                   @blur="field.handleBlur"
                   @update:model-value="(v) => field.handleChange(String(v))"
                 />
-                <p v-if="!field.state.meta.isValid" class="text-xs text-danger-content">
+                <p v-if="!field.state.meta.isValid" class="text-xs text-destructive">
                   {{ fieldErrors(field.state.meta.errors) }}
                 </p>
               </div>
@@ -772,7 +760,7 @@ const fieldErrors = (errors: unknown[]) =>
                   <legend class="mb-1.5 text-sm font-medium">Colour</legend>
                   <RadioGroup
                     :id="field.name"
-                    class="flex flex-wrap gap-1"
+                    class="flex flex-wrap gap-0.5"
                     :name="field.name"
                     :model-value="field.state.value"
                     @blur="field.handleBlur"
@@ -783,7 +771,7 @@ const fieldErrors = (errors: unknown[]) =>
                       v-for="colorOption in colorOptions"
                       :key="colorOption.value"
                       :for="`color-${colorOption.value}`"
-                      class="grid size-touch min-h-9 min-w-9 cursor-pointer place-items-center rounded-full"
+                      class="grid size-9 cursor-pointer place-items-center rounded-full"
                     >
                       <RadioGroupItem
                         :id="`color-${colorOption.value}`"
@@ -819,7 +807,7 @@ const fieldErrors = (errors: unknown[]) =>
           <!-- Recurring Event Fields (feature-flagged) -->
           <form.Field v-if="recurringEnabled" name="isRecurring">
             <template #default="{ field }">
-              <div class="flex min-h-touch items-center gap-2">
+              <div class="flex min-h-11 items-center gap-2">
                 <Checkbox
                   :id="field.name"
                   :name="field.name"
@@ -841,7 +829,7 @@ const fieldErrors = (errors: unknown[]) =>
           </form.Field>
 
           <!-- Recurring Pattern Fields (shown only when enabled and isRecurring is true) -->
-          <fieldset v-if="recurringEnabled && isRecurring" class="grid min-w-0 gap-4 rounded-lg border border-line-subtle bg-muted/40 p-3 sm:p-4">
+          <fieldset v-if="recurringEnabled && isRecurring" class="grid min-w-0 gap-4 rounded-lg border border-border bg-muted/40 p-3 sm:p-4">
             <legend class="sr-only">Recurrence</legend>
 
             <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
@@ -1002,8 +990,9 @@ const fieldErrors = (errors: unknown[]) =>
         </div>
 
         <!-- Actions stay reachable: pinned to the bottom of the sheet on phones. -->
-        <DialogFooter
-          class="sticky bottom-0 z-10 mt-auto grid grid-cols-2 gap-2 border-t border-line-subtle bg-popover px-5 pt-3 pb-1 sm:flex sm:px-6 sm:pb-6"
+        <!-- A plain container (not DialogFooter) so host dialog styles can't shift it. -->
+        <div
+          class="grid shrink-0 grid-cols-2 gap-2 border-t bg-popover px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:px-6 sm:pb-6"
         >
           <form.Subscribe>
             <template #default="{ canSubmit, isSubmitting }">
@@ -1012,7 +1001,7 @@ const fieldErrors = (errors: unknown[]) =>
                 type="button"
                 :variant="confirmingDelete ? 'destructive' : 'ghost'"
                 class="col-span-2 sm:col-span-1 sm:mr-auto"
-                :class="!confirmingDelete && 'text-danger-content'"
+                :class="!confirmingDelete && 'text-destructive'"
                 :disabled="isSubmitting"
                 @click="handleDelete"
               >
@@ -1024,7 +1013,7 @@ const fieldErrors = (errors: unknown[]) =>
               </Button>
             </template>
           </form.Subscribe>
-        </DialogFooter>
+        </div>
       </form>
     </DialogContent>
   </Dialog>

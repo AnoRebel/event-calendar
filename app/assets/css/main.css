@@ -295,6 +295,13 @@
   }
 }
 
+/* Docs code blocks: Shiki emits light colours inline and dark ones as variables. */
+:where([data-theme="dark"], [data-theme="high-contrast"]) .shiki,
+:where([data-theme="dark"], [data-theme="high-contrast"]) .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: transparent !important;
+}
+
 @keyframes drag-pulse {
   0%,
   100% {

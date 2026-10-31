@@ -9,7 +9,7 @@ import {
   setHours,
   setMinutes,
 } from "date-fns"
-import type { CalendarEvent, TimeSlot, DayColumnData } from "../types"
+import type { CalendarEvent, TimeSlot } from "../types"
 
 export const PIXELS_PER_HOUR_CONFIG = 60 // Can be made configurable
 
@@ -72,50 +72,6 @@ export function useCalendarUtils() {
       width,
       zIndex: overlappingEvents.length > 0 ? 10 + overlappingEvents.findIndex(e => e.id === event.id) : 5
     }
-  }
-
-  const detectOverlappingEvents = (events: CalendarEvent[], targetDate: Date): CalendarEvent[][] => {
-    const dayEvents = events.filter(event => {
-      const eventStart = new Date(event.startDate)
-      const eventEnd = new Date(event.endDate)
-      const dayStart = startOfDay(targetDate)
-      const dayEnd = endOfDay(targetDate)
-      
-      return (eventStart >= dayStart && eventStart <= dayEnd) ||
-             (eventEnd >= dayStart && eventEnd <= dayEnd) ||
-             (eventStart <= dayStart && eventEnd >= dayEnd)
-    })
-
-    const overlappingGroups: CalendarEvent[][] = []
-    const processed = new Set<string>()
-
-    dayEvents.forEach(event => {
-      if (processed.has(event.id)) return
-
-      const overlapping = [event]
-      processed.add(event.id)
-
-      dayEvents.forEach(otherEvent => {
-        if (processed.has(otherEvent.id) || event.id === otherEvent.id) return
-
-        const eventStart = new Date(event.startDate)
-        const eventEnd = new Date(event.endDate)
-        const otherStart = new Date(otherEvent.startDate)
-        const otherEnd = new Date(otherEvent.endDate)
-
-        // Check if events overlap
-        if ((eventStart < otherEnd && eventEnd > otherStart)) {
-          overlapping.push(otherEvent)
-          processed.add(otherEvent.id)
-        }
-      })
-
-      if (overlapping.length > 1) {
-        overlappingGroups.push(overlapping)
-      }
-    })
-
-    return overlappingGroups
   }
 
   const generateTimeSlots = (day: Date): TimeSlot[] => {

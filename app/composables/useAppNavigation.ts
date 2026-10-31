@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, UserRound } from "lucide-vue-next"
+import { BookOpen, CalendarDays, UserRound } from "@lucide/vue"
 
 // Primary destinations, shared by the top bar and the phone tab bar.
 export function useAppNavigation() {

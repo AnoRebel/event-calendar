@@ -86,6 +86,7 @@ provideCommandContext({
   <ListboxRoot
     data-slot="command"
     v-bind="forwarded"
+    @update:model-value="handleSelect"
     :class="cn('bg-popover text-popover-foreground flex h-full w-full flex-col overflow-hidden rounded-md', props.class)"
   >
     <slot />

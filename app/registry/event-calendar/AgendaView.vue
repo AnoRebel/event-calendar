@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { format, isToday } from "date-fns"
-import { CalendarX2, MapPin } from "lucide-vue-next"
+import { CalendarX2, MapPin } from "@lucide/vue"
 import type { CalendarEvent } from "./types"
 import { useColorManager } from "./composables/useColorManager"
 import { useEventStatus } from "./composables/useEventStatus"

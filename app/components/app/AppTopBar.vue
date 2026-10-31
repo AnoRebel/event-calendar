@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Moon, Palette, Sun } from "lucide-vue-next"
+import { Moon, Palette, Sun } from "@lucide/vue"
 import { Button } from "@/components/ui/button"
 
 const emit = defineEmits<{ (e: "appearance"): void }>()

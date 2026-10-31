@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { format, isValid, parseISO } from "date-fns"
 import { toast } from "vue-sonner"
-import { CloudOff, RefreshCw } from "lucide-vue-next"
+import { CloudOff, RefreshCw } from "@lucide/vue"
 import { Button } from "@/components/ui/button"
 import type { CalendarEvent, ViewMode } from "~/registry/event-calendar/types"
 import EventCalendar from "~/registry/event-calendar/EventCalendar.vue"

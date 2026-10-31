@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue"
-import { Check, MonitorSmartphone, RotateCcw } from "lucide-vue-next"
+import { Check, MonitorSmartphone, RotateCcw } from "@lucide/vue"
 import { toast } from "vue-sonner"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"

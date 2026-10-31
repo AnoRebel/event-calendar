@@ -35,7 +35,7 @@ import EventModal from "./EventModal.vue"
 import { useSwipe } from "@vueuse/core"
 import { Button } from "@/components/ui/button"
 import { PIXELS_PER_HOUR_CONFIG } from "./composables/useCalendarUtils"
-import { ChevronLeft, ChevronRight, Plus } from "lucide-vue-next"
+import { ChevronLeft, ChevronRight, Plus } from "@lucide/vue"
 
 const props = defineProps<{
   events: CalendarEvent[]
@@ -70,11 +70,11 @@ const VIEW_OPTIONS: Array<{ value: ViewMode; label: string; shortcut: string }> 
 const localEvents = shallowRef<CalendarEvent[]>([])
 
 // Initialize enhanced composables
-const { handleError, withErrorHandling, performHealthCheck } = useResilientErrorHandling()
-const { performSecurityCheck, sanitizeEvent, initializeSecurity } = useSecurity()
+const { handleError, withErrorHandling } = useResilientErrorHandling()
+const { performSecurityCheck, initializeSecurity } = useSecurity()
 const { ensureUUID } = useCompatibility()
-const { trackCalendarPerformance, measureOperation } = useMonitoring()
-const { validateEvent, sanitizeEvent: sanitizeEventData } = useAdvancedValidation()
+const { measureOperation } = useMonitoring()
+const { validateEvent } = useAdvancedValidation()
 const { processEventsWithTimezone, convertEventToDisplayTimezone } = useTimezone()
 
 // Initialize security and compatibility on component mount
@@ -117,16 +117,10 @@ const eventsComputed = computed(() => {
   
   return expandRecurringEventsInRange(viewStartDate.value, viewEndDate.value).value
 })
-const { getEventsForDay, getAllDayEventsForDay, getTimedEventsForDay, getAgendaEvents, isToday } = useEventFiltering(eventsComputed)
+const { getAllDayEventsForDay, getTimedEventsForDay, getAgendaEvents } = useEventFiltering(eventsComputed)
 
 // Initialize color manager
-const { 
-  assignUniqueColor, 
-  assignColorsToEvents, 
-  getColorClasses, 
-  hasColorConflict,
-  getColorStats 
-} = useColorManager(eventsComputed)
+const { assignUniqueColor } = useColorManager(eventsComputed)
 
 // Drag, drop and resize are handled inside the views (TimeGrid and MonthView)
 // with pointer events; they emit `eventUpdate` once per completed gesture.
@@ -377,7 +371,7 @@ defineExpose({
           </Button>
         </nav>
         <h1
-          class="m-0 min-w-0 truncate pl-1 font-display text-base leading-tight font-bold tracking-tight sm:text-xl"
+          class="m-0 min-w-0 truncate pl-1 text-base leading-tight font-bold tracking-tight sm:text-xl"
           aria-live="polite"
         >
           {{ calendarTitle }}

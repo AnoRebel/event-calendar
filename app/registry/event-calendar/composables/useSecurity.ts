@@ -324,7 +324,7 @@ export function useSecurity(
     violations.value.push(violation)
     
     // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env?.DEV) {
       console.warn('Security violation detected:', violation)
     }
     

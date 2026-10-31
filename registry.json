@@ -19,40 +19,27 @@
         "uuid",
         "@vue-dnd-kit/core",
         "vue-sonner",
-        "lucide-vue-next"
+        "@lucide/vue"
       ],
       "registryDependencies": [
         "button",
-        "card",
         "calendar",
         "checkbox",
         "command",
         "dialog",
-        "dropdown-menu",
         "input",
         "label",
         "popover",
         "radio-group",
-        "scroll-area",
         "select",
         "textarea",
         "toggle-group"
       ],
       "files": [
         {
-          "path": "app/registry/event-calendar/EventCalendar.vue",
+          "path": "app/registry/event-calendar/AgendaView.vue",
           "type": "registry:file",
-          "target": "components/ui/event-calendar/EventCalendar.vue"
-        },
-        {
-          "path": "app/registry/event-calendar/MonthView.vue",
-          "type": "registry:file",
-          "target": "components/ui/event-calendar/MonthView.vue"
-        },
-        {
-          "path": "app/registry/event-calendar/WeekView.vue",
-          "type": "registry:file",
-          "target": "components/ui/event-calendar/WeekView.vue"
+          "target": "components/ui/event-calendar/AgendaView.vue"
         },
         {
           "path": "app/registry/event-calendar/DayView.vue",
@@ -60,9 +47,9 @@
           "target": "components/ui/event-calendar/DayView.vue"
         },
         {
-          "path": "app/registry/event-calendar/AgendaView.vue",
+          "path": "app/registry/event-calendar/EventCalendar.vue",
           "type": "registry:file",
-          "target": "components/ui/event-calendar/AgendaView.vue"
+          "target": "components/ui/event-calendar/EventCalendar.vue"
         },
         {
           "path": "app/registry/event-calendar/EventModal.vue",
@@ -70,24 +57,24 @@
           "target": "components/ui/event-calendar/EventModal.vue"
         },
         {
-          "path": "app/registry/event-calendar/DragDropVisualFeedback.vue",
-          "type": "registry:file",
-          "target": "components/ui/event-calendar/DragDropVisualFeedback.vue"
-        },
-        {
           "path": "app/registry/event-calendar/LocationDisplay.vue",
           "type": "registry:file",
           "target": "components/ui/event-calendar/LocationDisplay.vue"
         },
         {
-          "path": "app/registry/event-calendar/EventResizeHandle.vue",
+          "path": "app/registry/event-calendar/MonthView.vue",
           "type": "registry:file",
-          "target": "components/ui/event-calendar/EventResizeHandle.vue"
+          "target": "components/ui/event-calendar/MonthView.vue"
         },
         {
-          "path": "app/registry/event-calendar/DayEventsOverflowPopup.vue",
+          "path": "app/registry/event-calendar/TimeGrid.vue",
           "type": "registry:file",
-          "target": "components/ui/event-calendar/DayEventsOverflowPopup.vue"
+          "target": "components/ui/event-calendar/TimeGrid.vue"
+        },
+        {
+          "path": "app/registry/event-calendar/WeekView.vue",
+          "type": "registry:file",
+          "target": "components/ui/event-calendar/WeekView.vue"
         },
         {
           "path": "app/registry/event-calendar/types.ts",
@@ -103,6 +90,11 @@
           "path": "app/registry/event-calendar/utils.ts",
           "type": "registry:file",
           "target": "components/ui/event-calendar/utils.ts"
+        },
+        {
+          "path": "app/registry/event-calendar/composables/useAdvancedValidation.ts",
+          "type": "registry:file",
+          "target": "components/ui/event-calendar/composables/useAdvancedValidation.ts"
         },
         {
           "path": "app/registry/event-calendar/composables/useCalendarUtils.ts",
@@ -140,9 +132,14 @@
           "target": "components/ui/event-calendar/composables/useKeyboardNavigation.ts"
         },
         {
-          "path": "app/registry/event-calendar/composables/useMultiDayLayout.ts",
+          "path": "app/registry/event-calendar/composables/useMonitoring.ts",
           "type": "registry:file",
-          "target": "components/ui/event-calendar/composables/useMultiDayLayout.ts"
+          "target": "components/ui/event-calendar/composables/useMonitoring.ts"
+        },
+        {
+          "path": "app/registry/event-calendar/composables/usePointerDrag.ts",
+          "type": "registry:file",
+          "target": "components/ui/event-calendar/composables/usePointerDrag.ts"
         },
         {
           "path": "app/registry/event-calendar/composables/useRecurringEvents.ts",
@@ -160,19 +157,14 @@
           "target": "components/ui/event-calendar/composables/useSecurity.ts"
         },
         {
+          "path": "app/registry/event-calendar/composables/useTimeGrid.ts",
+          "type": "registry:file",
+          "target": "components/ui/event-calendar/composables/useTimeGrid.ts"
+        },
+        {
           "path": "app/registry/event-calendar/composables/useTimezone.ts",
           "type": "registry:file",
           "target": "components/ui/event-calendar/composables/useTimezone.ts"
-        },
-        {
-          "path": "app/registry/event-calendar/composables/useAdvancedValidation.ts",
-          "type": "registry:file",
-          "target": "components/ui/event-calendar/composables/useAdvancedValidation.ts"
-        },
-        {
-          "path": "app/registry/event-calendar/composables/useMonitoring.ts",
-          "type": "registry:file",
-          "target": "components/ui/event-calendar/composables/useMonitoring.ts"
         }
       ]
     },

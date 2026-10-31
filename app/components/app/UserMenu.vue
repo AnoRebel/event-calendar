@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
-import { BookOpen, LogOut, Palette, UserRound } from "lucide-vue-next"
+import { BookOpen, LogOut, Palette, UserRound } from "@lucide/vue"
 import {
   DropdownMenu,
   DropdownMenuContent,
