@@ -1,115 +1,89 @@
 <script setup lang="ts">
 import { computed } from "vue"
-import { format } from "date-fns"
+import { format, isToday } from "date-fns"
+import { CalendarX2, MapPin } from "lucide-vue-next"
 import type { CalendarEvent } from "./types"
-import LocationDisplay from "./LocationDisplay.vue"
 import { useColorManager } from "./composables/useColorManager"
-import { useDragAndDropSystem } from "./composables/useDragAndDrop"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { getVisibleRange } from "./utils"
+import { useEventStatus } from "./composables/useEventStatus"
+import { dayFromKey } from "./composables/useTimeGrid"
 
 const props = defineProps<{
-  events: CalendarEvent[] // Expects events already sorted and filtered by the parent
-  currentDate: Date // Current date for month display
+  events: CalendarEvent[] // Already filtered to the visible range by the parent
+  currentDate: Date
 }>()
 
 const emit = defineEmits<{
   (e: "openEditModal", event: CalendarEvent): void
 }>()
 
-// Initialize color manager
 const eventsComputed = computed(() => props.events)
 const { getBorderColorClasses } = useColorManager(eventsComputed)
+const { getEventStatusClasses, getEventStatusTooltip } = useEventStatus(eventsComputed)
 
-// Initialize drag and drop system for duration display
-const { formatEventDuration } = useDragAndDropSystem()
-
-// Month display
-const monthDisplay = computed(() => {
-  return format(props.currentDate, "MMMM yyyy")
-})
-
-// Helper to group events by day for clearer display in agenda
-const groupedEvents = computed(() => {
-  if (!props.events || props.events.length === 0) return []
-
-  const groups: Record<string, CalendarEvent[]> = {}
-  props.events.forEach(event => {
-    const dayKey = format(new Date(event.startDate), "yyyy-MM-dd")
-    if (!groups[dayKey]) {
-      groups[dayKey] = []
-    }
-    groups[dayKey].push(event)
-  })
-
-  return Object.entries(groups)
-    .map(([dateStr, eventsOnDay]) => ({
-      date: new Date(dateStr), // Store actual date object for formatting
-      dateDisplay: format(new Date(dateStr), "EEEE, MMM d"),
-      events: eventsOnDay,
+// Events grouped by their (local) start day, days in order, events by start time.
+const groups = computed(() => {
+  const byDay = new Map<string, CalendarEvent[]>()
+  for (const event of props.events) {
+    const key = format(new Date(event.startDate), "yyyy-MM-dd")
+    byDay.set(key, [...(byDay.get(key) ?? []), event])
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, events]) => ({
+      key,
+      date: dayFromKey(key),
+      events: events.sort(
+        (a, b) => Number(!a.allDay) - Number(!b.allDay) || new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+      ),
     }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime()) // Ensure days are sorted
 })
+
+const timeRange = (event: CalendarEvent) =>
+  event.allDay ? "All day" : `${format(new Date(event.startDate), "p")} – ${format(new Date(event.endDate), "p")}`
 </script>
 
 <template>
-  <div class="space-y-4 p-2">
-    <!-- Month Header -->
-    <div class="text-center">
-      <h2 class="text-lg font-semibold text-foreground">{{ monthDisplay }}</h2>
-      <p class="text-sm text-muted-foreground">{{ props.events.length }} events this month</p>
+  <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-testid="agenda-view">
+    <div v-if="!groups.length" class="flex flex-col items-center gap-2 px-6 py-20 text-center text-muted-foreground">
+      <CalendarX2 class="size-8" aria-hidden="true" />
+      <p class="m-0 text-sm">Nothing scheduled in {{ format(currentDate, "MMMM yyyy") }}.</p>
     </div>
 
-    <ScrollArea class="h-[500px]">
-      <div v-if="!groupedEvents.length" class="text-muted-foreground text-center py-8">
-        No events in {{ monthDisplay.toLowerCase() }}.
-      </div>
-
-      <div v-for="group in groupedEvents" :key="group.dateDisplay" class="space-y-2 mb-4">
-        <h3 class="text-sm font-semibold text-primary sticky top-0 bg-background/95 py-1 px-2 rounded backdrop-blur-sm border-b">
-          {{ group.dateDisplay }}
-        </h3>
-        
-        <div
-          v-for="event in group.events"
-          :key="event.id"
-          :class="[
-            'border-l-3 hover:shadow-sm transition-all cursor-pointer rounded-r-md border bg-card p-3',
-            event.color ? getBorderColorClasses(event.color) : 'border-gray-500 dark:border-gray-400',
-          ]"
-          @click="emit('openEditModal', event)"
-        >
-          <div class="space-y-1">
-            <div class="flex items-start justify-between">
-              <h4 class="font-medium text-sm leading-tight">{{ event.title }}</h4>
-              <span v-if="formatEventDuration(event)" class="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded ml-2 shrink-0">
-                {{ formatEventDuration(event) }}
-              </span>
-            </div>
-            
-            <p class="text-xs text-muted-foreground">
-              <template v-if="event.allDay">All day</template>
-              <template v-else>
-                {{ format(new Date(event.startDate), "p") }} - {{ format(new Date(event.endDate), "p") }}
-              </template>
-            </p>
-            
-            <p v-if="event.description" class="text-xs text-muted-foreground line-clamp-2">
-              {{ event.description }}
-            </p>
-            
-            <div v-if="event.location" class="mt-1">
-              <LocationDisplay
-                :location="event.location"
-                :compact="true"
-                :show-tooltip="true"
-                :icon-size="12"
-              />
-            </div>
+    <ol v-else class="m-0 list-none p-0">
+      <li v-for="group in groups" :key="group.key" class="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-3 border-b px-3 py-3 sm:grid-cols-[5rem_minmax(0,1fr)] sm:px-4">
+        <div class="sticky top-3 self-start text-center" :aria-current="isToday(group.date) ? 'date' : undefined">
+          <div class="text-[0.7rem] font-semibold tracking-wide text-muted-foreground uppercase">{{ format(group.date, "EEE") }}</div>
+          <div
+            class="mx-auto grid size-10 place-items-center rounded-full font-[family-name:var(--font-family-numeric,inherit)] text-xl font-semibold tabular-nums"
+            :class="isToday(group.date) && 'bg-primary text-primary-foreground'"
+          >
+            {{ format(group.date, "d") }}
           </div>
+          <div class="text-[0.7rem] text-muted-foreground">{{ format(group.date, "MMM") }}</div>
         </div>
-      </div>
-    </ScrollArea>
+
+        <ul class="m-0 grid list-none gap-2 p-0">
+          <li v-for="event in group.events" :key="event.id">
+            <button
+              type="button"
+              :title="getEventStatusTooltip(event) || undefined"
+              :class="[
+                'w-full rounded-lg border border-l-4 bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
+                event.color ? getBorderColorClasses(event.color) : 'border-l-muted-foreground',
+                getEventStatusClasses(event),
+              ]"
+              @click="emit('openEditModal', event)"
+            >
+              <span class="block truncate text-sm font-semibold">{{ event.title }}</span>
+              <span class="block text-xs text-muted-foreground tabular-nums">{{ timeRange(event) }}</span>
+              <span v-if="event.location" class="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                <MapPin class="size-3 shrink-0" aria-hidden="true" />{{ event.location }}
+              </span>
+              <span v-if="event.description" class="mt-1 line-clamp-2 block text-xs text-muted-foreground">{{ event.description }}</span>
+            </button>
+          </li>
+        </ul>
+      </li>
+    </ol>
   </div>
 </template>

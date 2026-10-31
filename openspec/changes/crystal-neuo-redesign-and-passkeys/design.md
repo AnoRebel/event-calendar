@@ -24,6 +24,16 @@ the app cannot depend on it as a package.
 - Cross-browser live refraction (Chromium only, as Crystal Neuo documents).
 - OAuth providers.
 
+## Conventions
+
+- Dates: `date-fns` and `@date-fns/tz` (`TZDate`). `@internationalized/date` appears only where reka-ui's calendar
+  requires its `DateValue` type.
+- Forms: TanStack Form with valibot schemas as validators (Standard Schema), and the same valibot schemas validate on
+  the server.
+- Server state in the app: TanStack Query (`@tanstack/vue-query`) — events, account, passkeys, invites — with
+  optimistic updates for calendar mutations. The registry calendar stays data-agnostic (props in, emits out).
+- Utilities: VueUse. Charts, if any are added: TanStack Chart.
+
 ## Decisions
 
 ### 1. Vendor Crystal Neuo build output

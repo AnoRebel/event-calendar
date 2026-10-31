@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, shallowRef } from "vue"
 import { useKeyboardNavigation } from "./composables/useKeyboardNavigation"
-import { useDragAndDropSystem } from "./composables/useDragAndDrop"
 import {
   format,
   addMonths,
@@ -33,21 +32,17 @@ import WeekView from "./WeekView.vue"
 import DayView from "./DayView.vue"
 import AgendaView from "./AgendaView.vue"
 import EventModal from "./EventModal.vue"
-import DragDropVisualFeedback from "./DragDropVisualFeedback.vue"
+import { useSwipe } from "@vueuse/core"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuShortcut,
-} from "@/components/ui/dropdown-menu"
-import { PIXELS_PER_HOUR_CONFIG } from "./composables/useCalendarUtils" // Adjust path
-import { ChevronLeft, ChevronRight, Plus, ChevronDown } from "lucide-vue-next"
+import { PIXELS_PER_HOUR_CONFIG } from "./composables/useCalendarUtils"
+import { ChevronLeft, ChevronRight, Plus } from "lucide-vue-next"
 
 const props = defineProps<{
   events: CalendarEvent[]
+  /** Starting view when `v-model:view` is not used. */
   initialView?: ViewMode
+  /** Show a loading state over the grid (e.g. while the host fetches events). */
+  loading?: boolean
   // Optional feature toggles. Kept as a prop so the calendar has no framework
   // coupling; a Nuxt host can pass useFeatureFlags() here.
   features?: {
@@ -60,8 +55,18 @@ const emit = defineEmits<{
   (e: "eventDelete", eventId: string): void
 }>()
 
-const currentView = ref<ViewMode>(props.initialView || "month")
-const currentDate = ref(new Date())
+// Both are optional v-models, so a host can deep-link or persist them.
+const currentView = defineModel<ViewMode>("view", {
+  default: (raw: { initialView?: ViewMode }) => raw.initialView || "month",
+})
+const currentDate = defineModel<Date>("date", { default: () => new Date() })
+
+const VIEW_OPTIONS: Array<{ value: ViewMode; label: string; shortcut: string }> = [
+  { value: "month", label: "Month", shortcut: "M" },
+  { value: "week", label: "Week", shortcut: "W" },
+  { value: "day", label: "Day", shortcut: "D" },
+  { value: "agenda", label: "Agenda", shortcut: "A" },
+]
 const localEvents = shallowRef<CalendarEvent[]>([])
 
 // Initialize enhanced composables
@@ -123,18 +128,8 @@ const {
   getColorStats 
 } = useColorManager(eventsComputed)
 
-// Initialize enhanced drag and drop system
-const { 
-  globalDragState, 
-  formatEventDuration, 
-  calculateEventHeight 
-} = useDragAndDropSystem({
-  enabled: true,
-  crossViewEnabled: true,
-  visualFeedback: true,
-  showDuration: true,
-  enableResize: true
-})
+// Drag, drop and resize are handled inside the views (TimeGrid and MonthView)
+// with pointer events; they emit `eventUpdate` once per completed gesture.
 
 watch(
   () => props.events,
@@ -333,108 +328,105 @@ useKeyboardNavigation(
   () => openAddModalHandler()
 )
 
-// Drag and drop system is automatically initialized when useDragAndDropSystem is called
+// Touch: swipe left/right to move between periods. The week view scrolls
+// sideways on phones, so it keeps its own horizontal gesture.
+const gridEl = ref<HTMLElement | null>(null)
+// Gestures that start on an event are drags/resizes, never period swipes.
+let swipeFromEvent = false
+const onGridPointerDown = (e: PointerEvent) => {
+  swipeFromEvent = !!(e.target as HTMLElement | null)?.closest("[data-event-id], [data-resize]")
+}
+const { direction: swipeDirection } = useSwipe(gridEl, {
+  threshold: 60,
+  passive: true,
+  onSwipeEnd: () => {
+    if (currentView.value === "week" || isEventModalOpen.value) return
+    if (swipeFromEvent) return
+    if (swipeDirection.value === "left") navigate("next")
+    else if (swipeDirection.value === "right") navigate("prev")
+  },
+})
 
-// Exposed for testing: these are internal to the component but the test suite
-// drives event CRUD and view switching through them.
+// Exposed for hosts (e.g. an "add event" deep link) and for the test suite,
+// which drives event CRUD and view switching through these.
 defineExpose({
   currentView,
+  currentDate,
   localEvents,
   handleModalSubmit,
   handleModalDelete,
+  openAddModal: (date?: Date) => openAddModalHandler(date),
 })
 </script>
 
 <template>
-  <div class="p-6 flex flex-col h-full bg-background text-foreground border border-border rounded-lg shadow-sm transition-colors duration-300">
-    
-    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3 sm:gap-0">
-      <!-- Navigation and title -->
-      <div class="flex items-center gap-2 w-full sm:w-auto">
-        <nav class="flex items-center gap-1 sm:gap-2" role="navigation" aria-label="Calendar navigation">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            class="h-9 w-9 p-0"
-            :aria-label="`Go to previous ${currentView}`"
-            @click="navigate('prev')"
-          >
-            <ChevronLeft :size="16" aria-hidden="true" />
-            <span class="sr-only">Previous</span>
+  <section
+    class="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm"
+    aria-label="Calendar"
+  >
+    <header class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 py-3 sm:px-4">
+      <!-- Title + period navigation -->
+      <div class="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+        <nav class="flex shrink-0 items-center gap-1" aria-label="Calendar navigation">
+          <Button variant="outline" size="icon-sm" :aria-label="`Previous ${currentView}`" @click="navigate('prev')">
+            <ChevronLeft aria-hidden="true" />
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            class="h-9 px-3"
-            @click="navigate('today')"
-            aria-label="Go to today"
-          >
-            Today
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            class="h-9 w-9 p-0"
-            :aria-label="`Go to next ${currentView}`"
-            @click="navigate('next')"
-          >
-            <ChevronRight :size="16" aria-hidden="true" />
-            <span class="sr-only">Next</span>
+          <Button variant="outline" size="sm" @click="navigate('today')">Today</Button>
+          <Button variant="outline" size="icon-sm" :aria-label="`Next ${currentView}`" @click="navigate('next')">
+            <ChevronRight aria-hidden="true" />
           </Button>
         </nav>
-        <h1 class="text-lg sm:text-xl font-semibold ml-2 sm:ml-4 truncate" role="heading" aria-level="1">
+        <h1
+          class="m-0 min-w-0 truncate pl-1 font-display text-base leading-tight font-bold tracking-tight sm:text-xl"
+          aria-live="polite"
+        >
           {{ calendarTitle }}
         </h1>
       </div>
-      <!-- Actions -->
-      <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-        <Button
-          variant="default"
-          size="sm"
-          class="h-9 px-3"
-          data-testid="add-event"
-          @click="openAddModalHandler()"
-        >
-          <Plus :size="16" class="mr-1" />
-          <span class="hidden sm:inline">Add Event</span>
-          <span class="sm:hidden">Add</span>
+
+      <!-- View switch + actions -->
+      <div class="flex w-full items-center gap-2 sm:w-auto">
+        <div role="radiogroup" aria-label="Calendar view" class="flex flex-1 rounded-lg border bg-muted p-0.5 sm:flex-none">
+          <button
+            v-for="option in VIEW_OPTIONS"
+            :key="option.value"
+            type="button"
+            role="radio"
+            :aria-checked="currentView === option.value"
+            :aria-keyshortcuts="option.shortcut"
+            :title="`${option.label} (${option.shortcut})`"
+            :data-view="option.value"
+            class="min-h-8 flex-1 rounded-md px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm sm:flex-none sm:text-sm"
+            @click="currentView = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <Button size="sm" data-testid="add-event" class="shrink-0" @click="openAddModalHandler()">
+          <Plus aria-hidden="true" />
+          <span class="max-sm:sr-only">Add event</span>
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="outline" size="sm" class="h-9 gap-1.5 px-3">
-              <span>
-                <span className="min-[480px]:hidden" aria-hidden="true">
-                  {{ currentView.charAt(0).toUpperCase() }}
-                </span>
-                <span className="max-[479px]:sr-only">
-                  {{ currentView.charAt(0).toUpperCase() + currentView.slice(1) }}
-                </span>
-              </span>
-              <ChevronDown class="-me-1 opacity-60" :size="16" aria-hidden="true" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" class="min-w-32">
-            <DropdownMenuItem @click="() => (currentView = 'month')">
-              Month <DropdownMenuShortcut>M</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="() => (currentView = 'week')">
-              Week <DropdownMenuShortcut>W</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="() => (currentView = 'day')">
-              Day <DropdownMenuShortcut>D</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem @click="() => (currentView = 'agenda')">
-              Agenda <DropdownMenuShortcut>A</DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <!-- Host-provided header actions (e.g. a dark-mode toggle). Optional so
-             the calendar has no theming/framework coupling of its own. -->
+        <!-- Host-provided actions (e.g. a theme switch). The calendar has no
+             theming or framework coupling of its own. -->
         <slot name="header-actions" />
       </div>
     </header>
 
-    <main class="flex-grow overflow-auto">
+    <div
+      ref="gridEl"
+      class="relative flex min-h-0 flex-1 flex-col"
+      :aria-busy="loading || undefined"
+      @pointerdown.capture="onGridPointerDown"
+    >
+      <div
+        v-if="loading"
+        class="absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden bg-primary/15"
+        role="status"
+        aria-label="Loading events"
+      >
+        <div class="h-full w-1/3 animate-[calendar-loading_1.1s_ease-in-out_infinite] bg-primary" />
+      </div>
+
       <MonthView
         v-if="currentView === 'month'"
         :days="monthViewDaysComputed"
@@ -442,9 +434,10 @@ defineExpose({
         @open-add-modal="openAddModalHandler"
         @open-edit-modal="openEditModalHandler"
         @event-update="handleEventUpdateFromView"
+        @open-day="date => { currentDate = date; currentView = 'day' }"
       />
       <WeekView
-        v-if="currentView === 'week'"
+        v-else-if="currentView === 'week'"
         :week-days-data="weekViewDaysComputed"
         :pixels-per-hour="PIXELS_PER_HOUR_CONFIG"
         @open-add-modal="openAddModalHandler"
@@ -452,7 +445,7 @@ defineExpose({
         @event-update="handleEventUpdateFromView"
       />
       <DayView
-        v-if="currentView === 'day'"
+        v-else-if="currentView === 'day'"
         :day-data="dayViewDataComputed"
         :pixels-per-hour="PIXELS_PER_HOUR_CONFIG"
         @open-add-modal="openAddModalHandler"
@@ -460,12 +453,12 @@ defineExpose({
         @event-update="handleEventUpdateFromView"
       />
       <AgendaView
-        v-if="currentView === 'agenda'"
+        v-else
         :events="agendaEventsComputed"
         :current-date="currentDate"
         @open-edit-modal="openEditModalHandler"
       />
-    </main>
+    </div>
 
     <!-- Event Add/Edit Modal (Dialog) -->
     <EventModal
@@ -479,13 +472,21 @@ defineExpose({
       @delete-event="handleModalDelete"
     />
 
-    <!-- Drag and Drop Visual Feedback -->
-    <DragDropVisualFeedback
-      :is-dragging="globalDragState?.isDragging || false"
-      :dragged-event="globalDragState?.draggedEvent"
-      :valid-drop-zones="globalDragState?.validDropZones?.map(zone => zone.id) || []"
-      :current-drop-zone="globalDragState?.currentDropZone?.id"
-      :drag-position="globalDragState?.dragPreview ? { x: globalDragState.dragPreview.x, y: globalDragState.dragPreview.y } : { x: 0, y: 0 }"
-    />
-  </div>
+  </section>
 </template>
+
+<style>
+@keyframes calendar-loading {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [aria-label="Loading events"] > div {
+    animation: none;
+  }
+}
+</style>

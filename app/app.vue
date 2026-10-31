@@ -2,48 +2,35 @@
 import { Toaster } from "@/components/ui/sonner"
 import "vue-sonner/style.css"
 import { useServiceWorker } from "~/composables/useServiceWorker"
-import { useCompatibility } from "~/registry/event-calendar/composables/useCompatibility"
-import { useMobileEnhancement } from "~/composables/useMobileEnhancement"
 import { useMonitoring } from "~/registry/event-calendar/composables/useMonitoring"
 
-const { isDark } = useDarkMode()
+const { isDark } = useAppearance()
+const isPhone = useMediaQuery("(max-width: 767px)")
 
-// App-wide services shared across pages.
-const { state: swState } = useServiceWorker()
-const compatibility = useCompatibility()
-const mobileEnhancement = useMobileEnhancement()
+// Offline shell + update prompt, and global error reporting.
+useServiceWorker()
 const monitoring = useMonitoring()
-
-compatibility.initialize()
-
-// Feature detection classes + global error monitoring.
-onMounted(() => {
-  document.documentElement.classList.add(...compatibility.getFeatureClasses())
-})
-
 if (import.meta.client) {
   window.addEventListener("unhandledrejection", event => {
     monitoring.recordError({
       error: event.reason?.message || "Unhandled promise rejection",
       component: "global",
     })
-    event.preventDefault()
   })
 }
 
 useHead({
   titleTemplate: title => (title ? `${title} · Event Calendar` : "Event Calendar"),
   meta: [
-    { name: "description", content: "A configurable, drag-and-drop event calendar for Vue 3 and Nuxt." },
-    { name: "viewport", content: "width=device-width, initial-scale=1" },
-    { name: "theme-color", content: "#ffffff" },
+    { name: "description", content: "A drag-and-drop event calendar for Vue 3 and Nuxt, with passkeys and the Crystal Neuo design system." },
     { name: "apple-mobile-web-app-capable", content: "yes" },
-    { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+    { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
   ],
   link: [
-    { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-    { rel: "manifest", href: "/manifest.json" },
-    { rel: "apple-touch-icon", href: "/favicon.ico" },
+    { rel: "icon", type: "image/svg+xml", href: "/icon.svg" },
+    { rel: "icon", type: "image/x-icon", href: "/favicon.ico", sizes: "any" },
+    { rel: "manifest", href: "/manifest.webmanifest" },
+    { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
   ],
 })
 </script>
@@ -52,17 +39,15 @@ useHead({
   <!-- DnDProvider must wrap the app: vue-dnd-kit v2 composables run via inject
        inside descendant components (the calendar views). -->
   <DnDProvider>
-    <div class="min-h-screen bg-background">
-      <NuxtRouteAnnouncer />
+    <NuxtRouteAnnouncer />
+    <NuxtLayout>
       <NuxtPage />
-      <Toaster
-        class="pointer-events-auto"
-        :theme="isDark ? 'dark' : 'light'"
-        position="top-right"
-        rich-colors
-        close-button
-      />
-    </div>
+    </NuxtLayout>
+    <Toaster
+      :theme="isDark ? 'dark' : 'light'"
+      :position="isPhone ? 'top-center' : 'bottom-right'"
+      close-button
+    />
     <DragPreview />
   </DnDProvider>
 </template>

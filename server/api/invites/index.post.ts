@@ -24,5 +24,5 @@ export default defineEventHandler(async (event) => {
     })
 
   setResponseStatus(event, 201)
-  return { token, email: email || null }
+  return { token, email: email || null, expiresAt: addDays(now, days).toISOString() }
 })

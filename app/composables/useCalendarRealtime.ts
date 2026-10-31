@@ -1,9 +1,9 @@
 import { ref, onScopeDispose } from "vue"
-import type { RemoteEventChange } from "~/composables/useCalendarData"
+import type { RemoteEventChange } from "~/composables/useCalendarEvents"
 
 // Connects to the Nitro WebSocket and applies remote event changes. Real-time is
 // an enhancement: if the socket is unavailable, CRUD over HTTP still works. The
-// caller supplies `apply` (useCalendarData.applyRemote) and a set of ids the
+// caller supplies `apply` (useCalendarEvents().applyRemote) and a set of ids the
 // client itself just wrote, so echoes of its own changes aren't re-applied.
 export function useCalendarRealtime(
   apply: (change: RemoteEventChange) => void,

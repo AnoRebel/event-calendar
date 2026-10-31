@@ -56,7 +56,7 @@ const tiers = [
         <Icon name="lucide:arrow-left" size="15" />
         Back to calendar
       </NuxtLink>
-      <DarkModeToggle />
+
     </div>
 
     <!-- Header -->

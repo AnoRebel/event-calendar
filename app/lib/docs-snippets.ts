@@ -30,5 +30,5 @@ export const usageSnippet = `<EventCalendar
   @event-delete="onDelete"
 >
   <!-- optional: your own header control -->
-  <template #header-actions><DarkModeToggle /></template>
+  <template #header-actions><ThemeToggle /></template>
 </EventCalendar>`

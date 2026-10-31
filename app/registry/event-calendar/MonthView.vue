@@ -1,308 +1,233 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from "vue"
-import { format, startOfDay, subDays, isSameDay } from "date-fns"
-import type { CalendarEvent, MonthViewDay } from "./types"
-import DayEventsOverflowPopup from "./DayEventsOverflowPopup.vue"
-import LocationDisplay from "./LocationDisplay.vue"
-import { useColorManager } from "./composables/useColorManager"
-import { useDragAndDropSystem } from "./composables/useDragAndDrop"
-import { useEventStatus } from "./composables/useEventStatus"
-import { useMultiDayLayout, type LayoutEvent } from "./composables/useMultiDayLayout"
-import { Button } from "@/components/ui/button"
-import { Popover, PopoverTrigger } from "@/components/ui/popover"
+import { computed, ref } from "vue"
+import { endOfDay, format, isSameDay, isWithinInterval, startOfDay, subMilliseconds } from "date-fns"
+import { useMediaQuery } from "@vueuse/core"
 import { Plus } from "lucide-vue-next"
+import type { CalendarEvent, MonthViewDay } from "./types"
+import { useColorManager } from "./composables/useColorManager"
+import { useEventStatus } from "./composables/useEventStatus"
+import { usePointerDrag } from "./composables/usePointerDrag"
+import { moveToDay } from "./composables/useTimeGrid"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 const props = defineProps<{
   days: MonthViewDay[]
+  /** Kept for API compatibility with the other views; unused here. */
+  pixelsPerHour?: number
 }>()
 
 const emit = defineEmits<{
   (e: "openAddModal", date: Date, isAllDaySlot?: boolean, allDayTargetDate?: Date): void
   (e: "openEditModal" | "eventUpdate", event: CalendarEvent): void
+  /** A day was chosen (phones): the calendar opens it in the day view. */
+  (e: "openDay", date: Date): void
 }>()
 
-// --- Overflow Popup State ---
-const MAX_VISIBLE_EVENTS_IN_MONTH_CELL = 2 // Configurable
-const overflowPopupOpenForDateKey = ref<string | null>(null)
-const overflowPopupTargetRef = ref<HTMLElement | null>(null)
+const MAX_CHIPS = 3
+const isPhone = useMediaQuery("(max-width: 639px)")
 
-// Initialize enhanced drag and drop system
-const { createDragConfig, formatEventDuration } = useDragAndDropSystem()
+const allEvents = computed(() => {
+  const seen = new Map<string, CalendarEvent>()
+  for (const day of props.days) for (const e of day.events) seen.set(e.id, e)
+  return [...seen.values()]
+})
+const { getColorClasses } = useColorManager(allEvents)
+const { getEventStatusClasses, getEventStatusTooltip } = useEventStatus(allEvents)
 
-const getDndConfigForDayCell = (dayDate: Date) =>
-  createDragConfig(
-    `month-${format(dayDate, "yyyy-MM-dd")}`,
-    "day-cell",
-    format(dayDate, "yyyy-MM-dd"),
-    (updatedEvent: CalendarEvent) => emit("eventUpdate", updatedEvent),
-    60 // pixelsPerHour not really used in month view, but required for interface
-  )
-
-// Note: Now using direct props data instead of drag-and-drop managed events for better reliability
-
-// Drag handlers for events
-const handleEventDragStart = (event: CalendarEvent, dragEvent: DragEvent) => {
-  if (!dragEvent.dataTransfer) return
-
-  dragEvent.dataTransfer.setData("application/json", JSON.stringify(event))
-  dragEvent.dataTransfer.effectAllowed = "move"
-
-  document.body.classList.add("dragging-event")
+// Static class names (Tailwind can't see dynamically built ones like `bg-${color}-500`).
+const DOT: Record<string, string> = {
+  sky: "bg-sky-500",
+  amber: "bg-amber-500",
+  violet: "bg-violet-500",
+  rose: "bg-rose-500",
+  emerald: "bg-emerald-500",
+  orange: "bg-orange-500",
 }
+const dotClass = (event: CalendarEvent) => DOT[event.color ?? ""] ?? "bg-muted-foreground"
 
-const handleEventDragEnd = (event: CalendarEvent, dragEvent: DragEvent) => {
-  document.body.classList.remove("dragging-event")
+// --- Drag between days (pointer events) -------------------------------------------
+const drag = usePointerDrag({
+  events: allEvents,
+  resolve: (event, x, y) => {
+    const cell = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-month-cell]")
+    return cell ? moveToDay(event, cell.dataset.dateKey!) : null
+  },
+  commit: event => emit("eventUpdate", event),
+})
+
+// An event shows on a day when it overlaps it; an event ending exactly at midnight
+// does not spill into the next day.
+const coversDay = (event: CalendarEvent, day: Date) => {
+  const start = startOfDay(new Date(event.startDate))
+  const endRaw = new Date(event.endDate)
+  const end = endRaw > new Date(event.startDate) ? subMilliseconds(endRaw, 1) : endRaw
+  return isWithinInterval(day, { start, end: endOfDay(end) })
 }
+const isMultiDay = (event: CalendarEvent) => !isSameDay(new Date(event.startDate), subMilliseconds(new Date(event.endDate), 1))
 
-// Drop zone handlers
-const handleDragEnter = (dragEvent: DragEvent, dayKey: string) => {
-  if (dragEvent.currentTarget instanceof HTMLElement) {
-    dragEvent.currentTarget.classList.add("drop-zone-active")
-  }
-}
-
-const handleDragLeave = (dragEvent: DragEvent, dayKey: string) => {
-  if (dragEvent.currentTarget instanceof HTMLElement) {
-    dragEvent.currentTarget.classList.remove("drop-zone-active")
-  }
-}
-
-const handleDrop = (dragEvent: DragEvent, dayKey: string, dayDate: Date) => {
-  dragEvent.preventDefault()
-
-  if (dragEvent.currentTarget instanceof HTMLElement) {
-    dragEvent.currentTarget.classList.remove("drop-zone-active")
-  }
-
-  const draggedData = dragEvent.dataTransfer?.getData("application/json")
-  if (!draggedData) return
-
-  try {
-    const droppedEvent: CalendarEvent = JSON.parse(draggedData)
-    const config = getDndConfigForDayCell(dayDate)
-    config.handleDrop(droppedEvent)
-  } catch (error) {
-    console.error("❌ Error handling drop:", error)
-  }
-}
-
-const toggleOverflowPopup = (dayKey: string, event: MouseEvent) => {
-  if (overflowPopupOpenForDateKey.value === dayKey) {
-    overflowPopupOpenForDateKey.value = null
-    overflowPopupTargetRef.value = null
-  } else {
-    overflowPopupOpenForDateKey.value = dayKey
-    overflowPopupTargetRef.value = event.currentTarget as HTMLElement
-  }
-}
-
-const handleOverflowEventEdit = (event: CalendarEvent) => {
-  emit("openEditModal", event)
-  overflowPopupOpenForDateKey.value = null // Close popup
-}
-
-// Initialize color manager for getting color classes
-const eventsComputed = computed(() => {
-  const allEvents: CalendarEvent[] = []
-  props.days.forEach(day => {
-    allEvents.push(...day.events)
+// Per day: events with the drag preview applied, multi-day/all-day first.
+const cells = computed(() => {
+  const moved = drag.current()
+  return props.days.map(day => {
+    let events = moved ? day.events.filter(e => e.id !== moved.id) : day.events
+    if (moved && coversDay(moved, day.date)) events = [...events, moved]
+    events = [...events].sort((a, b) => {
+      const spanA = isMultiDay(a) || a.allDay ? 0 : 1
+      const spanB = isMultiDay(b) || b.allDay ? 0 : 1
+      return spanA - spanB || new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+    })
+    return { day, key: format(day.date, "yyyy-MM-dd"), events }
   })
-  return allEvents
 })
-const { getColorClasses } = useColorManager(eventsComputed)
 
-// Initialize event status manager
-const { getEventStatusClasses, getEventStatusIndicator, getEventStatusTooltip } = useEventStatus(eventsComputed)
+const weekdays = computed(() => props.days.slice(0, 7).map(d => d.date))
+const rows = computed(() => Math.ceil(props.days.length / 7))
 
-// Initialize multi-day layout system
-const daysComputed = computed(() => props.days)
-const { processEventsWithLayout, getEventPosition } = useMultiDayLayout(daysComputed)
-
-// Multi-day event helper functions
-const isMultiDayEvent = (event: CalendarEvent): boolean => {
-  const startDate = new Date(event.startDate)
-  const endDate = new Date(event.endDate)
-  const startDay = startOfDay(startDate)
-  const endDay = startOfDay(endDate)
-
-  // Check if the event spans more than one day
-  return !isSameDay(startDay, endDay)
+const onCellClick = (date: Date) => {
+  if (drag.shouldSuppressClick()) return
+  if (isPhone.value) emit("openDay", date)
+  else emit("openAddModal", date)
 }
-
-const isEventStart = (event: CalendarEvent, date: Date): boolean => {
-  const eventStart = startOfDay(new Date(event.startDate))
-  const currentDay = startOfDay(date)
-  return isSameDay(eventStart, currentDay)
+const openEvent = (event: CalendarEvent) => {
+  if (!drag.shouldSuppressClick()) emit("openEditModal", event)
 }
+const openMore = ref<string | null>(null)
 
-const isEventEnd = (event: CalendarEvent, date: Date): boolean => {
-  const eventEnd = startOfDay(new Date(event.endDate))
-  const currentDay = startOfDay(date)
-  // For events ending at midnight, consider them ending on the previous day
-  const effectiveEnd =
-    new Date(event.endDate).getHours() === 0 && new Date(event.endDate).getMinutes() === 0
-      ? subDays(eventEnd, 1)
-      : eventEnd
-
-  return isSameDay(effectiveEnd, currentDay)
+const chipClasses = (event: CalendarEvent, date: Date) => {
+  const spans = isMultiDay(event) || event.allDay
+  const startsHere = isSameDay(new Date(event.startDate), date)
+  const endsHere = isSameDay(subMilliseconds(new Date(event.endDate), 1), date) || !isMultiDay(event)
+  return cn(
+    "calendar-event flex w-full min-w-0 cursor-grab items-center gap-1.5 px-1.5 py-0.5 text-left text-xs leading-5 outline-none select-none touch-pan-y [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-ring",
+    getEventStatusClasses(event),
+    spans
+      ? cn(
+          "border font-medium",
+          event.color ? getColorClasses(event.color) : "bg-muted border-border",
+          startsHere ? "rounded-l-md" : "-ml-1.5 rounded-l-none border-l-0 pl-3",
+          endsHere ? "rounded-r-md" : "-mr-1.5 rounded-r-none border-r-0",
+        )
+      : "rounded-md hover:bg-accent",
+    drag.dragging.value?.id === event.id && "pointer-events-none opacity-90 ring-2 ring-ring",
+  )
 }
-
-const getMultiDayEventClasses = (event: CalendarEvent, date: Date): string => {
-  if (!isMultiDayEvent(event)) {
-    return "rounded"
-  }
-
-  const isStart = isEventStart(event, date)
-  const isEnd = isEventEnd(event, date)
-
-  if (isStart && isEnd) {
-    return "rounded"
-  } else if (isStart) {
-    return "rounded-l rounded-r-none"
-  } else if (isEnd) {
-    return "rounded-r rounded-l-none"
-  } else {
-    return "rounded-none"
-  }
-}
-
-// Cleanup on unmount
-onUnmounted(() => {
-  overflowPopupOpenForDateKey.value = null
-  overflowPopupTargetRef.value = null
-})
 </script>
 
 <template>
-  <div class="border border-border rounded-lg overflow-hidden">
-    <!-- Header Row -->
-    <div class="grid grid-cols-7 bg-muted/50">
+  <div class="flex min-h-0 flex-1 flex-col" data-testid="month-view">
+    <div class="grid grid-cols-7 border-b bg-muted/40">
       <div
-        v-for="dayHeader in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
-        :key="dayHeader"
-        class="p-2 text-center font-medium border-r border-border last:border-r-0 h-10 flex items-center justify-center text-sm"
+        v-for="day in weekdays"
+        :key="day.toISOString()"
+        class="py-2 text-center text-[0.7rem] font-semibold tracking-wide text-muted-foreground uppercase"
       >
-        {{ dayHeader }}
+        <span class="sm:hidden">{{ format(day, "EEEEE") }}</span>
+        <span class="max-sm:hidden">{{ format(day, "EEE") }}</span>
       </div>
     </div>
 
-    <!-- Calendar Grid -->
-    <div class="grid grid-cols-7" style="grid-template-rows: repeat(6, minmax(140px, 1fr))">
+    <div
+      class="grid min-h-0 flex-1 grid-cols-7 overflow-y-auto overscroll-contain"
+      :class="drag.dragging.value && 'cursor-grabbing select-none'"
+      :style="{ gridTemplateRows: `repeat(${rows}, minmax(${isPhone ? '3.75rem' : '7rem'}, 1fr))` }"
+    >
       <div
-        v-for="day in processEventsWithLayout"
-        :key="day.date.toISOString()"
-        :data-date-key="format(day.date, 'yyyy-MM-dd')"
-        data-type="day-cell"
-        @dragover.prevent
-        @dragenter="handleDragEnter($event, format(day.date, 'yyyy-MM-dd'))"
-        @dragleave="handleDragLeave($event, format(day.date, 'yyyy-MM-dd'))"
-        @drop="handleDrop($event, format(day.date, 'yyyy-MM-dd'), day.date)"
+        v-for="cell in cells"
+        :key="cell.key"
+        data-month-cell
+        :data-date-key="cell.key"
+        class="group/cell relative flex min-w-0 flex-col gap-0.5 border-r border-b p-1 transition-colors [&:nth-child(7n)]:border-r-0"
         :class="[
-          'p-2 border-r border-b border-border last-of-type:border-r-0 relative group flex flex-col',
-          day.isCurrentMonth ? 'bg-background' : 'bg-muted/30',
-          { 'bg-blue-50 dark:bg-blue-900/30': day.isToday },
+          !cell.day.isCurrentMonth && 'bg-muted/40 text-muted-foreground',
+          drag.dragging.value && drag.current() && coversDay(drag.current()!, cell.day.date) && 'bg-accent/50',
         ]"
+        @click="onCellClick(cell.day.date)"
       >
-        <!-- Day Number -->
-        <div class="flex justify-between items-start mb-2 shrink-0">
-          <span :class="['text-sm font-medium', { 'font-bold text-blue-600 dark:text-blue-400': day.isToday }]">{{
-            format(day.date, "d")
-          }}</span>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            class="cursor-pointer opacity-0 group-hover:opacity-100 h-7 w-7 p-0 text-primary hover:text-primary-foreground hover:bg-primary transition-all duration-200 rounded-full shadow-sm hover:shadow-md dark:hover:text-primary"
-            @click="emit('openAddModal', day.date, true, day.date)"
-            :title="`Add event on ${format(day.date, 'MMM d')}`"
+        <div class="flex items-center justify-between">
+          <button
+            type="button"
+            class="grid size-7 place-items-center rounded-full font-[family-name:var(--font-family-numeric,inherit)] text-sm tabular-nums hover:bg-accent"
+            :class="cell.day.isToday && 'bg-primary font-semibold text-primary-foreground hover:bg-primary'"
+            :aria-label="format(cell.day.date, 'EEEE, MMMM d')"
+            :aria-current="cell.day.isToday ? 'date' : undefined"
+            @click.stop="emit('openDay', cell.day.date)"
           >
-            <Plus :size="14" class="font-bold stroke-2" />
-          </Button>
+            {{ format(cell.day.date, "d") }}
+          </button>
+          <button
+            type="button"
+            class="grid size-6 place-items-center rounded-full text-primary opacity-0 transition-opacity group-hover/cell:opacity-100 hover:bg-accent focus-visible:opacity-100 max-sm:hidden"
+            :aria-label="`Add event on ${format(cell.day.date, 'EEEE, MMMM d')}`"
+            @click.stop="emit('openAddModal', cell.day.date)"
+          >
+            <Plus class="size-3.5" />
+          </button>
         </div>
 
-        <!-- Events Container -->
-        <div class="flex-1 overflow-hidden min-h-0 relative">
-          <!-- Events positioned by lane -->
-          <div class="relative min-h-[44px]">
-            <div
-              v-for="(eventItem, index) in day.events.slice(0, MAX_VISIBLE_EVENTS_IN_MONTH_CELL)"
-              :key="eventItem.id"
-              :style="{
-                position: 'absolute',
-                top: `${(eventItem as LayoutEvent).layoutLane * 22}px`,
-                left: '0',
-                right: '0',
-                height: '20px',
-                zIndex: 10 + index,
-              }"
-              :class="[
-                'px-1.5 py-0.5 text-xs cursor-move event-content border-2 transition-all duration-200 hover:shadow-md select-none flex items-center',
-                getMultiDayEventClasses(eventItem, day.date),
-                getEventStatusClasses(eventItem),
-                eventItem.color
-                  ? getColorClasses(eventItem.color)
-                  : 'bg-gray-200 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100',
-              ]"
-              draggable="true"
-              :data-event-id="eventItem.id"
-              :title="getEventStatusTooltip(eventItem)"
-              @click="emit('openEditModal', eventItem)"
-              @dragstart="handleEventDragStart(eventItem, $event)"
-              @dragend="handleEventDragEnd(eventItem, $event)"
-            >
-              <div class="flex items-center gap-1 min-w-0 w-full">
-                <!-- Status indicator -->
-                <span
-                  v-if="getEventStatusIndicator(eventItem) && isEventStart(eventItem, day.date)"
-                  class="text-xs opacity-75 shrink-0"
-                >
-                  {{ getEventStatusIndicator(eventItem) }}
-                </span>
-                <span class="truncate flex-1 font-medium leading-tight text-xs">{{ eventItem.title }}</span>
-                <LocationDisplay
-                  v-if="eventItem.location && isEventStart(eventItem, day.date)"
-                  :location="eventItem.location"
-                  :compact="true"
-                  :show-tooltip="true"
-                  :icon-size="6"
-                />
-              </div>
-            </div>
+        <!-- Phones: colour dots (tap the day to open it). -->
+        <div v-if="cell.events.length" class="flex flex-wrap gap-0.5 px-1 sm:hidden" aria-hidden="true">
+          <span v-for="event in cell.events.slice(0, 4)" :key="event.id" class="size-1.5 rounded-full" :class="dotClass(event)" />
+          <span v-if="cell.events.length > 4" class="text-[0.6rem] leading-none">+</span>
+        </div>
+
+        <!-- Wider screens: event chips -->
+        <div class="grid min-w-0 gap-0.5 max-sm:hidden">
+          <div
+            v-for="event in cell.events.slice(0, MAX_CHIPS)"
+            :key="event.id"
+            role="button"
+            tabindex="0"
+            :data-event-id="event.id"
+            :title="getEventStatusTooltip(event) || event.title"
+            :class="chipClasses(event, cell.day.date)"
+            @pointerdown="drag.start(event, $event)"
+            @click.stop="openEvent(event)"
+            @keydown.enter.prevent="openEvent(event)"
+          >
+            <template v-if="isMultiDay(event) || event.allDay">
+              <span class="truncate">{{ event.title }}</span>
+            </template>
+            <template v-else>
+              <span class="size-2 shrink-0 rounded-full" :class="dotClass(event)" aria-hidden="true" />
+              <span class="shrink-0 text-muted-foreground tabular-nums">{{ format(new Date(event.startDate), "p").replace(":00", "") }}</span>
+              <span class="truncate font-medium">{{ event.title }}</span>
+            </template>
           </div>
 
-          <!-- +More button positioned below the events -->
-          <div
-            v-if="day.events.length > MAX_VISIBLE_EVENTS_IN_MONTH_CELL"
-            :style="{ paddingTop: `${Math.max(MAX_VISIBLE_EVENTS_IN_MONTH_CELL * 22 - 22, 0)}px` }"
-            class="mt-1"
+          <Popover
+            v-if="cell.events.length > MAX_CHIPS"
+            :open="openMore === cell.key"
+            @update:open="open => (openMore = open ? cell.key : null)"
           >
-            <Popover
-              :open="overflowPopupOpenForDateKey === format(day.date, 'yyyy-MM-dd')"
-              @update:open="
-                isOpen => {
-                  if (!isOpen) overflowPopupOpenForDateKey = null
-                }
-              "
-            >
-              <PopoverTrigger as-child>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="w-full text-xs h-auto py-1 px-1 justify-start text-muted-foreground hover:bg-muted/50 bg-background/80"
-                  @click.stop="toggleOverflowPopup(format(day.date, 'yyyy-MM-dd'), $event)"
+            <PopoverTrigger as-child>
+              <button
+                type="button"
+                class="w-full rounded-md px-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                @click.stop
+              >
+                {{ cell.events.length - MAX_CHIPS }} more
+              </button>
+            </PopoverTrigger>
+            <PopoverContent class="w-64 p-2" align="start" @click.stop>
+              <p class="mb-2 px-1 text-sm font-semibold">{{ format(cell.day.date, "EEEE, MMMM d") }}</p>
+              <div class="grid gap-1">
+                <button
+                  v-for="event in cell.events"
+                  :key="event.id"
+                  type="button"
+                  class="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  @click="openMore = null; emit('openEditModal', event)"
                 >
-                  + {{ day.events.length - MAX_VISIBLE_EVENTS_IN_MONTH_CELL }} more
-                </Button>
-              </PopoverTrigger>
-              <DayEventsOverflowPopup
-                v-if="overflowPopupOpenForDateKey === format(day.date, 'yyyy-MM-dd')"
-                :events="day.events.slice(MAX_VISIBLE_EVENTS_IN_MONTH_CELL)"
-                :date="day.date"
-                @edit-event="handleOverflowEventEdit"
-                @close="overflowPopupOpenForDateKey = null"
-              />
-            </Popover>
-          </div>
+                  <span class="size-2 shrink-0 rounded-full" :class="dotClass(event)" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate">{{ event.title }}</span>
+                  <span class="shrink-0 text-xs text-muted-foreground">
+                    {{ event.allDay ? "All day" : format(new Date(event.startDate), "p") }}
+                  </span>
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>

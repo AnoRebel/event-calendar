@@ -1,4 +1,5 @@
 import tailwindcss from "@tailwindcss/vite"
+import { prePaintScript } from "./app/lib/crystal-neuo/index.js"
 
 // Analytics site IDs are resolved at BUILD time. nuxt-umami bakes its site id into
 // a generated config during the module setup hook, so setting NUXT_UMAMI_SITE_ID
@@ -21,6 +22,23 @@ if (analyticsEnabled && !umamiSiteId) {
   )
 }
 
+// Crystal Neuo: give <html> the default axes, then apply the visitor's stored
+// appearance (validated by the runtime) before first paint. The attributes are
+// deliberately not bound through Vue/Unhead, which would reset them on hydration.
+const appearanceScript =
+  `(()=>{var d=document.documentElement.dataset;d.material||(d.material="refraction");` +
+  `d.platform||(d.platform="web");d.density||(d.density="comfortable");` +
+  `d.theme||(d.theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")})();` +
+  prePaintScript
+
+// Each material's display, text and numeric faces (system fallbacks are built
+// into the tokens, so nothing breaks if these fail to load).
+const fontsHref =
+  "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800" +
+  "&family=Doto:wght@600;800&family=Figtree:wght@400..800&family=Geist:wght@400..800" +
+  "&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700" +
+  "&family=JetBrains+Mono:wght@400;600&display=swap"
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-08-16",
@@ -41,13 +59,10 @@ export default defineNuxtConfig({
     scheduledTasks: {
       "0 0 * * *": ["demo:reset"],
     },
+    // Pages depend on the session, so they are server-rendered per request (a
+    // prerendered "/" would freeze the signed-out state into the HTML).
     prerender: {
-      crawlLinks: true,
-      routes: ["/"],
-    },
-    routeRules: {
-      "/": { prerender: true },
-      "/api/**": { cors: true, headers: { "Access-Control-Allow-Origin": "*" } },
+      crawlLinks: false,
     },
   },
 
@@ -77,11 +92,25 @@ export default defineNuxtConfig({
 
   app: {
     head: {
+      htmlAttrs: { lang: "en" },
+      meta: [
+        { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+        { name: "theme-color", content: "#EEF0F5", media: "(prefers-color-scheme: light)" },
+        { name: "theme-color", content: "#0D0F15", media: "(prefers-color-scheme: dark)" },
+        { name: "color-scheme", content: "light dark" },
+      ],
+      link: [
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
+        { rel: "stylesheet", href: fontsHref },
+      ],
       // Rybbit: only inject the tracker when a site id is configured and analytics
       // are enabled. Behavior (endpoint + site id) is preserved from before; the
       // site id is now resolved once above rather than read inline.
-      script:
-        analyticsEnabled && rybbitSiteId
+      script: [
+        // Blocking on purpose: must run before the first paint.
+        { innerHTML: appearanceScript, tagPosition: "head", tagPriority: "critical" },
+        ...(analyticsEnabled && rybbitSiteId
           ? [
               {
                 src: "https://rybbit.anorebel.net/api/script.js",
@@ -89,7 +118,8 @@ export default defineNuxtConfig({
                 "data-site-id": rybbitSiteId,
               },
             ]
-          : [],
+          : []),
+      ],
     },
   },
 
@@ -100,6 +130,11 @@ export default defineNuxtConfig({
     proxy: "cloak",
     enabled: analyticsEnabled,
     logErrors: true,
+  },
+
+  // Passkeys (WebAuthn) via nuxt-auth-utils + @simplewebauthn.
+  auth: {
+    webAuthn: true,
   },
 
   // Runtime config for environment variables
@@ -188,7 +223,7 @@ export default defineNuxtConfig({
 
   // Components: shadcn-nuxt registers components/ui itself, so the default
   // scan skips that folder (otherwise every index.ts collides with its .vue).
-  components: [{ path: "~/components", ignore: ["ui/**"] }],
+  components: [{ path: "~/components", pathPrefix: false, ignore: ["ui/**"] }],
 
   // Component configuration
   shadcn: {

@@ -13,8 +13,9 @@ export default defineEventHandler(async (event) => {
   // Same error whether the account is missing or the password is wrong — don't
   // reveal which accounts exist.
   const invalid = () => createError({ status: 401, message: "Invalid email or password" })
-  if (!user) {
-    // Still run a verify to reduce timing signal.
+  if (!user?.passwordHash) {
+    // Missing account, or a passkey-only account: same error, and still spend
+    // the time of a verify so the response does not reveal which.
     await verifyPassword("$scrypt$placeholder", password).catch(() => false)
     throw invalid()
   }

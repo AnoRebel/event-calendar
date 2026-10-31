@@ -1,6 +1,7 @@
 import { ref, computed, reactive } from "vue"
 import { makeDraggable, makeDroppable, type IDragEvent } from "@vue-dnd-kit/core"
 import { startOfDay, endOfDay, setHours, setMinutes } from "date-fns"
+import { moveToAllDay, moveToDay, moveToTime } from './useTimeGrid'
 import type { CalendarEvent } from "../types"
 import { useCalendarUtils } from "./useCalendarUtils"
 
@@ -63,55 +64,18 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
     onEventUpdate: (event: CalendarEvent) => void,
     pixelsPerHour = 60
   ) => {
-    const handleDrop = (droppedEvent: CalendarEvent) => {
+    // `minutes` (past midnight) is where the event was dropped in a timed column.
+    const handleDrop = (droppedEvent: CalendarEvent, minutes?: number) => {
       try {
-        let updatedEvent: CalendarEvent
-
-        if (zoneType === 'all-day') {
-          const newDate = new Date(dateKey)
-          if (isNaN(newDate.getTime())) {
-            throw new Error(`Invalid date: ${dateKey}`)
-          }
-          updatedEvent = {
-            ...droppedEvent,
-            startDate: newDate,
-            endDate: new Date(newDate),
-            allDay: true
-          }
-        } else if (zoneType === 'timed') {
-          const originalStart = new Date(droppedEvent.startDate)
-          const originalEnd = new Date(droppedEvent.endDate)
-          if (isNaN(originalStart.getTime()) || isNaN(originalEnd.getTime())) {
-            throw new Error('Invalid original event dates')
-          }
-          
-          const originalDuration = originalEnd.getTime() - originalStart.getTime()
-          const newStart = new Date(dateKey + 'T09:00:00')
-          if (isNaN(newStart.getTime())) {
-            throw new Error(`Invalid date: ${dateKey}`)
-          }
-          const newEnd = new Date(newStart.getTime() + originalDuration)
-          
-          updatedEvent = {
-            ...droppedEvent,
-            startDate: newStart,
-            endDate: newEnd,
-            allDay: false
-          }
-        } else {
-          const originalStart = new Date(droppedEvent.startDate)
-          const originalEnd = new Date(droppedEvent.endDate)
-          
-          updatedEvent = {
-            ...droppedEvent,
-            startDate: new Date(dateKey + 'T' + originalStart.toTimeString().split(' ')[0]),
-            endDate: new Date(dateKey + 'T' + originalEnd.toTimeString().split(' ')[0])
-          }
-        }
-        
+        const updatedEvent =
+          zoneType === 'all-day'
+            ? moveToAllDay(droppedEvent, dateKey)
+            : zoneType === 'timed'
+              ? moveToTime(droppedEvent, dateKey, minutes ?? new Date(droppedEvent.startDate).getHours() * 60)
+              : moveToDay(droppedEvent, dateKey)
         onEventUpdate(updatedEvent)
       } catch (error) {
-        console.error('❌ Error updating event:', error)
+        console.error('Could not move the event:', error)
       }
     }
 
@@ -359,72 +323,7 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
     return Math.max(hours * pixelsPerHour, 20) // Minimum 20px height
   }
 
-  // Resize functionality
-  const createResizeHandler = (
-    event: CalendarEvent,
-    onEventUpdate: (event: CalendarEvent) => void,
-    direction: 'start' | 'end' = 'end'
-  ) => {
-    if (!finalConfig.enableResize) return null
-    
-    let isResizing = false
-    let startY = 0
-    let originalEvent: CalendarEvent
-
-    const handleMouseDown = (e: MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      
-      isResizing = true
-      startY = e.clientY
-      originalEvent = { ...event }
-      
-      if (typeof document !== 'undefined') {
-        document.addEventListener('mousemove', handleMouseMove)
-        document.addEventListener('mouseup', handleMouseUp)
-        document.body.classList.add('resizing-event')
-      }
-    }
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return
-      
-      const deltaY = e.clientY - startY
-      const pixelsPerHour = 60
-      const timeChange = (deltaY / pixelsPerHour) * 60 * 60 * 1000
-
-      let newEvent: CalendarEvent
-      
-      if (direction === 'start') {
-        const newStartTime = new Date(originalEvent.startDate.getTime() + timeChange)
-        newEvent = {
-          ...originalEvent,
-          startDate: newStartTime
-        }
-      } else {
-        const newEndTime = new Date(originalEvent.endDate.getTime() + timeChange)
-        newEvent = {
-          ...originalEvent,
-          endDate: newEndTime
-        }
-      }
-      
-      if (newEvent.endDate.getTime() - newEvent.startDate.getTime() >= 15 * 60 * 1000) {
-        onEventUpdate(newEvent)
-      }
-    }
-
-    const handleMouseUp = () => {
-      isResizing = false
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-        document.body.classList.remove('resizing-event')
-      }
-    }
-
-    return { handleMouseDown }
-  }
+  // Resizing lives in TimeGrid.vue (pointer events, one update on release).
 
   // Enhanced visual feedback utilities
   const addDragStyles = () => {
@@ -502,7 +401,6 @@ export function useDragAndDropSystem(config: Partial<DragDropConfig> = {}) {
       getCurrentDropZone,
       formatEventDuration,
       calculateEventHeight,
-      createResizeHandler,
       addDragStyles,
       makeDraggable,
       makeDroppable

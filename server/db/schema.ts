@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core"
 
 // Events table. Kept dialect-portable: only text/integer columns and the Drizzle
 // query builder are used elsewhere, so moving to Postgres is a config + import
@@ -30,14 +30,44 @@ export const events = sqliteTable("events", {
   updatedAt: text("updated_at").notNull(),
 })
 
-// Users. Sessions are sealed cookies (nuxt-auth-utils) and need no table — this
-// is the only auth table the app owns. Password auth stores only a scrypt hash.
+// Users. Sessions are sealed cookies (nuxt-auth-utils) and need no table.
+// Password auth stores only a scrypt hash; an account created with a passkey has
+// no password hash at all.
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name"),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   createdAt: text("created_at").notNull(),
+})
+
+// Passkeys (WebAuthn credentials). Only the public key is stored. `id` is the
+// credential id (base64url) the authenticator reports on every sign-in.
+export const credentials = sqliteTable(
+  "credentials",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    backedUp: integer("backed_up", { mode: "boolean" }).notNull().default(false),
+    transports: text("transports"), // JSON array of AuthenticatorTransport
+    aaguid: text("aaguid"),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+  },
+  table => [index("credentials_user_id_idx").on(table.userId)],
+)
+
+// Single-use WebAuthn challenges, keyed by the attempt id handed to the client.
+// Stored in the database (not memory) so any server instance can verify them.
+export const webauthnChallenges = sqliteTable("webauthn_challenges", {
+  attemptId: text("attempt_id").primaryKey(),
+  challenge: text("challenge").notNull(),
+  expiresAt: text("expires_at").notNull(),
 })
 
 // Invites. When registration is invite-only (the default), a valid unused,
@@ -55,5 +85,6 @@ export type EventRow = typeof events.$inferSelect
 export type NewEventRow = typeof events.$inferInsert
 export type UserRow = typeof users.$inferSelect
 export type NewUserRow = typeof users.$inferInsert
+export type CredentialRow = typeof credentials.$inferSelect
 export type InviteRow = typeof invites.$inferSelect
 export type NewInviteRow = typeof invites.$inferInsert
