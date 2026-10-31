@@ -19,8 +19,8 @@ logs
 .idea
 .kiro
 .claude
+.pi
 .opencode
-openspec
 .serena
 
 # Local env files
