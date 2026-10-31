@@ -15,13 +15,14 @@ The service worker SHALL NOT store or serve responses from `/api/` or the realti
 
 ### Requirement: Offline shell
 
-Page navigations SHALL be network-first and fall back to the most recently cached page shell when offline; versioned
-build assets SHALL be served cache-first.
+Page navigations SHALL be network-first and fall back to a generic offline page when the network is unavailable;
+pages rendered for a signed-in user SHALL NOT be cached. Versioned build assets SHALL be served cache-first.
 
 #### Scenario: Offline reload
 
 - **WHEN** a previously visited app is reloaded with the network off
-- **THEN** the app shell renders and shows that the network is unavailable instead of a browser error page
+- **THEN** an offline page explains the network is unavailable and retries when it returns, instead of a browser
+  error page
 
 #### Scenario: New deployment
 

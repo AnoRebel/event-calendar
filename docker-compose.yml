@@ -9,6 +9,7 @@
 #   LIBSQL_URL=http://sqld:8080 docker compose --profile sqld up -d
 services:
   app:
+    image: event-calendar:latest
     build:
       context: .
       dockerfile: Dockerfile

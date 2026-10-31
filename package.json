@@ -29,8 +29,7 @@
     "db:studio": "bun --bun drizzle-kit studio",
     "db:seed": "bun --bun scripts/seed.ts",
     "design:sync": "bun scripts/sync-crystal-neuo.ts",
-    "security:audit": "npm audit --audit-level moderate",
-    "security:fix": "npm audit fix",
+    "security:audit": "bun audit --audit-level=moderate",
     "deploy": "bash scripts/deploy.sh",
     "deploy:rollback": "bash scripts/deploy.sh rollback",
     "health-check": "bash scripts/deploy.sh health-check",
@@ -38,8 +37,7 @@
     "docker:run": "docker-compose up -d",
     "docker:stop": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "performance:audit": "lighthouse http://localhost:3000 --output=html",
-    "sw:generate": "workbox generateSW workbox-config.js"
+    "performance:audit": "lighthouse http://localhost:3000 --output=html"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
@@ -93,7 +91,6 @@
     "shiki": "^4.5.0",
     "typescript": "^6.0.3",
     "vitest": "^5.0.5",
-    "vue-tsc": "^3.3.14",
-    "workbox-cli": "^7.4.1"
+    "vue-tsc": "^3.3.14"
   }
 }

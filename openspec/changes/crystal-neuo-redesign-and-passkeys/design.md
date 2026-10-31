@@ -95,7 +95,8 @@ passkey or a password.
 
 ### 7. Service worker
 
-Rewritten from scratch with one `fetch` listener: navigations are network-first with a cached shell fallback;
+Rewritten from scratch with one `fetch` listener: navigations are network-first with a static offline page as the
+fallback (server-rendered pages carry the user's name and email, so they are never cached);
 `/_nuxt/` hashed assets are cache-first; `/api/` and `/_ws` are never intercepted. Old caches are deleted on activate.
 `skipWaiting` is driven by the existing update prompt.
 
