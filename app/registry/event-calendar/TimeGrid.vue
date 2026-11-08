@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 import { addMinutes, differenceInMinutes, format, isSameDay, startOfDay } from "date-fns"
 import { useIntervalFn, useNow } from "@vueuse/core"
-import { MapPin, Plus } from "@lucide/vue"
+import { GripVertical, MapPin, Plus } from "@lucide/vue"
 import type { CalendarEvent, DayColumnData } from "./types"
 import { useColorManager } from "./composables/useColorManager"
 import { useEventStatus } from "./composables/useEventStatus"
@@ -307,6 +307,10 @@ const eventClasses = (event: CalendarEvent) =>
     event.color ? getColorClasses(event.color) : "bg-muted border-border text-foreground",
   )
 
+// Grip bars on the resize edges: faint at rest, clear on hover/focus, always shown on touch.
+const resizeGripClasses =
+  "h-1 w-8 rounded-full bg-current opacity-30 transition-opacity group-hover/event:opacity-70 group-focus-visible/event:opacity-70 pointer-coarse:opacity-60"
+
 const gridStyle = computed(() => ({
   gridTemplateColumns: `3.5rem repeat(${props.days.length}, minmax(${props.minColumnWidth}, 1fr))`,
 }))
@@ -422,7 +426,10 @@ const gridStyle = computed(() => ({
           @keydown.enter.prevent="openEvent(item.event)"
           @keydown.space.prevent="openEvent(item.event)"
         >
-          <span class="block truncate font-semibold">{{ item.event.title }}</span>
+          <span class="flex items-start gap-1">
+            <span class="min-w-0 flex-1 truncate font-semibold">{{ item.event.title }}</span>
+            <GripVertical class="size-3 shrink-0 opacity-40 transition-opacity group-hover/event:opacity-80 group-focus-visible/event:opacity-80 pointer-coarse:opacity-70" aria-hidden="true" />
+          </span>
           <span v-if="item.bottom - item.top >= 40" class="block truncate opacity-80 tabular-nums">
             {{ format(new Date(item.event.startDate), "p") }} – {{ format(new Date(item.event.endDate), "p") }}
           </span>
@@ -430,17 +437,19 @@ const gridStyle = computed(() => ({
             <MapPin class="size-3 shrink-0" aria-hidden="true" />{{ item.event.location }}
           </span>
 
-          <!-- Resize handles: top and bottom edges. -->
+          <!-- Resize handles: top and bottom edges, each with a visible grip bar. -->
           <!-- Slim edges so short events stay easy to grab and move; the top handle
                only appears when the event is tall enough to leave room to grab. -->
           <span
             v-if="(item.bottom - item.top) * pxPerMinute >= 40"
-            class="pointer-events-auto absolute inset-x-0 top-0 h-1.5 cursor-ns-resize touch-pan-y"
+            class="pointer-events-auto absolute inset-x-0 top-0 flex h-2 cursor-ns-resize touch-pan-y items-start justify-center pt-px"
             aria-hidden="true"
             data-resize="start"
             @pointerdown="onResizePointerDown(item.event, 'start', $event)"
             @click.stop
-          />
+          >
+            <span :class="resizeGripClasses" />
+          </span>
           <span
             class="pointer-events-auto absolute inset-x-0 bottom-0 flex h-2 cursor-ns-resize touch-pan-y items-end justify-center pb-px"
             aria-hidden="true"
@@ -448,7 +457,7 @@ const gridStyle = computed(() => ({
             @pointerdown="onResizePointerDown(item.event, 'end', $event)"
             @click.stop
           >
-            <span class="h-0.5 w-6 rounded-full bg-current opacity-0 transition-opacity group-hover/event:opacity-50" />
+            <span :class="resizeGripClasses" />
           </span>
         </div>
 

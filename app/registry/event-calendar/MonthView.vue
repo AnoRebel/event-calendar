@@ -2,7 +2,7 @@
 import { computed, ref } from "vue"
 import { endOfDay, format, isSameDay, isWithinInterval, startOfDay, subMilliseconds } from "date-fns"
 import { useMediaQuery } from "@vueuse/core"
-import { Plus } from "@lucide/vue"
+import { GripVertical, Plus } from "@lucide/vue"
 import type { CalendarEvent, MonthViewDay } from "./types"
 import { useColorManager } from "./composables/useColorManager"
 import { useEventStatus } from "./composables/useEventStatus"
@@ -99,7 +99,7 @@ const chipClasses = (event: CalendarEvent, date: Date) => {
   const startsHere = isSameDay(new Date(event.startDate), date)
   const endsHere = isSameDay(subMilliseconds(new Date(event.endDate), 1), date) || !isMultiDay(event)
   return cn(
-    "calendar-event flex w-full min-w-0 cursor-grab items-center gap-1.5 px-1.5 py-0.5 text-left text-xs leading-5 outline-none select-none touch-pan-y [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-ring",
+    "calendar-event group/chip flex w-full min-w-0 cursor-grab items-center gap-1.5 px-1.5 py-0.5 text-left text-xs leading-5 outline-none select-none touch-pan-y [-webkit-touch-callout:none] focus-visible:ring-2 focus-visible:ring-ring",
     getEventStatusClasses(event),
     spans
       ? cn(
@@ -193,6 +193,7 @@ const chipClasses = (event: CalendarEvent, date: Date) => {
               <span class="shrink-0 text-muted-foreground tabular-nums">{{ format(new Date(event.startDate), "p").replace(":00", "") }}</span>
               <span class="truncate font-medium">{{ event.title }}</span>
             </template>
+            <GripVertical class="ml-auto size-3 shrink-0 opacity-0 transition-opacity group-hover/chip:opacity-60 group-focus-visible/chip:opacity-60 pointer-coarse:opacity-50" aria-hidden="true" />
           </div>
 
           <Popover
