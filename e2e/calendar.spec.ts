@@ -134,6 +134,22 @@ describe("calendar", () => {
     })
   }, T)
 
+  test("opens the docs from the calendar without a full page load", async () => {
+    await step("calendar-to-docs", async () => {
+      const page = await ensureSignedIn()
+      await page.evaluate(() => (document.querySelector('a[href="/docs"]') as HTMLElement).click())
+      await page.waitForTimeout(3000)
+      const state = await page.evaluate(() => ({
+        path: location.pathname,
+        heading: document.querySelector("main h1")?.textContent ?? "",
+        csp: !!document.querySelector('meta[http-equiv="Content-Security-Policy"]'),
+      }))
+      expect(state.path).toBe("/docs")
+      expect(state.heading).not.toContain("Page not found")
+      expect(state.csp).toBe(false)
+    })
+  }, T)
+
   test("creates, edits and deletes an event, persisting across reloads", async () => {
     await step("event-lifecycle", async () => {
       const page = await ensureSignedIn()
