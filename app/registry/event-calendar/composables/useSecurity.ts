@@ -2,7 +2,6 @@ import { ref, readonly } from 'vue'
 import type { CalendarEvent } from '../types'
 
 interface SecurityConfig {
-  enableCSP: boolean
   sanitizeInputs: boolean
   enableRateLimit: boolean
   maxEventsPerUser: number
@@ -30,7 +29,6 @@ interface SecurityViolation {
  */
 export function useSecurity(
   config: SecurityConfig = {
-    enableCSP: true,
     sanitizeInputs: true,
     enableRateLimit: true,
     maxEventsPerUser: 1000,
@@ -43,26 +41,9 @@ export function useSecurity(
   const violations = ref<SecurityViolation[]>([])
   const rateLimitStore = ref<Map<string, RateLimitEntry>>(new Map())
 
-  // Content Security Policy
-  const setupCSP = (): void => {
-    if (!securityConfig.value.enableCSP || typeof document === 'undefined') return
-
-    const cspMeta = document.createElement('meta')
-    cspMeta.httpEquiv = 'Content-Security-Policy'
-    cspMeta.content = [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'", // Allow inline scripts for Vue
-      "style-src 'self' 'unsafe-inline'", // Allow inline styles
-      "img-src 'self' data: https:",
-      "font-src 'self' https:",
-      "connect-src 'self' https:",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'"
-    ].join('; ')
-
-    document.head.appendChild(cspMeta)
-  }
+  // No Content-Security-Policy is set here: a component can't know what its host
+  // app loads, and a page-wide <meta> CSP can't be removed once added. Set CSP
+  // as a response header in the host app.
 
   // Input sanitization
   const sanitizeHtml = (input: string): string => {
@@ -392,8 +373,6 @@ export function useSecurity(
 
   // Initialize security
   const initializeSecurity = (): void => {
-    setupCSP()
-    
     // Set up global error handling for security
     if (typeof window !== 'undefined') {
       window.addEventListener('error', (event) => {
